@@ -1,6 +1,8 @@
 local imageinfo = require("imageinfo")
 local drw = require("drw")
-local img = imageinfo.load("blackboard_empty.png")
+
+local filename = ...
+local img = imageinfo.load(filename)
 
 output = {}
 output[1] = {img.h, img.w}
@@ -13,7 +15,7 @@ for row=2, img.h + 1, 1 do
 end
 
 drw.scrclear()
-drw.picture_print("output")
+drw.picture_print(img)
 
 
 
