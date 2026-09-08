@@ -1,18 +1,61 @@
 #include <lauxlib.h>
 #include <lualib.h>
+//#include <stdlib.h>
+//#include <stdio.h>
+#include <string.h>
+#include <argp.h>
+
+struct arguments {
+    char *args[3];
+    int no_scaling;
+    int no_vert_scaling;
+    char *filepath;
+};
+
+static char doc[] = "CLI tool to print images in terminal";
+static char args_doc[] = "filepath";
+static struct argp_option options[] = {
+    {"no-scaling", 'n', 0, 0, "Prints image without scaling it down to fit the terminal window"},
+    {"no-vert-scaling", 'v', 0, 0, "Prints image after scaling it down to fit on width, ignoring image height"},
+    {"help", 'h', 0, 0, "Shows this help list"},
+    {0},
+};
+static error_t parse_opt(int key, char *arg, struct argp_state *state){
+    struct arguments *arguments = state->input;
+
+    switch (key) {
+    case 'n':
+        arguments->no_scaling = 1;
+        break;
+    case 'v':
+        arguments->no_vert_scaling = 1;
+        break;
+    case 'h':
+        argp_state_help(state, stdout, ARGP_HELP_STD_HELP);
+    case ARGP_KEY_ARG:
+        arguments->filepath = arg;
+        break;
+    case ARGP_KEY_END:
+        if (strcmp(arguments->filepath, "") == 0){
+            argp_usage(state);
+        }
+        break;
+    default:
+        return ARGP_ERR_UNKNOWN;
+    }
+    return 0;
+}
+static struct argp argp = {options, parse_opt, args_doc, doc};
 
 int luaopen_imageinfo(lua_State *L);
 int luaopen_drw(lua_State *L);
 
-int main(int argc, char *argv[]) {
-    if (argc == 1) {
-        printf("Need file name\n");
-        return 1;
-    }
-    else if (argc > 2) {
-        printf("Only provide file name\n");
-        return 1;
-    }
+int main(int argc, char **argv) {
+    struct arguments arguments;
+    arguments.no_scaling = 0;
+    arguments.no_vert_scaling = 0;
+    arguments.filepath = "";
+    argp_parse(&argp, argc, argv, ARGP_NO_HELP, 0, &arguments);
 
     lua_State *L = luaL_newstate();
     luaL_openlibs(L);
@@ -23,8 +66,10 @@ int main(int argc, char *argv[]) {
     lua_pop(L, 1);
 
     luaL_loadfile(L, "main.lua");
-    lua_pushstring(L, argv[1]);
-    lua_pcall(L, 1, 0, 0);
+    lua_pushstring(L, arguments.filepath);
+    lua_pushinteger(L, arguments.no_scaling);
+    lua_pushinteger(L, arguments.no_vert_scaling);
+    lua_pcall(L, 3, 0, 0);
 
     lua_close(L);
     return 0;
