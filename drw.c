@@ -47,7 +47,12 @@ unsigned char* gettermbg(){
     }
 }
 
-void pixel_print(unsigned char *fg, unsigned char *bg, unsigned char *termbg){
+void pixel_print(unsigned char *fg, unsigned char *bg){
+    printf("%c[38;2;%d;%d;%dm", 0x1B, *fg, *(fg + 1), *(fg + 2));
+    printf("%c[48;2;%d;%d;%dm\u2580", 0x1B, *bg, *(bg + 1), *(bg + 2));
+}
+
+void pixel_print_4ch(unsigned char *fg, unsigned char *bg, unsigned char *termbg){
     if (*(fg + 3) != 255){
         float alpha = (float)*(fg + 3) / 255;
         *fg = (*fg * alpha) + (*termbg * (1.0 - alpha));
@@ -60,8 +65,7 @@ void pixel_print(unsigned char *fg, unsigned char *bg, unsigned char *termbg){
         *(bg + 1) = (*(bg + 1) * alpha) + (*(termbg + 1) * (1.0 - alpha));
         *(bg + 2) = (*(bg + 2) * alpha) + (*(termbg + 2) * (1.0 - alpha));
     }
-    printf("%c[38;2;%d;%d;%dm", 0x1B, *fg, *(fg + 1), *(fg + 2));
-    printf("%c[48;2;%d;%d;%dm\u2580", 0x1B, *bg, *(bg + 1), *(bg + 2));
+    pixel_print(fg ,bg);
 }
 
 int l_pictureprint(lua_State *L){
@@ -70,7 +74,12 @@ int l_pictureprint(lua_State *L){
     
     for (int row = 0; row < img->h; row += 2){
         for (int col = 0; col < img->w; col++){
-            pixel_print(img->data + (row * img->w * img->c) + (col * img->c), img->data + ((row + 1) * img->w * img->c) + (col * img->c), termbg);
+            if (img->c == 4){
+                pixel_print_4ch(img->data + (row * img->w * img->c) + (col * img->c), img->data + ((row + 1) * img->w * img->c) + (col * img->c), termbg);
+            }
+            else if (img->c == 3){
+                pixel_print(img->data + (row * img->w * img->c) + (col * img->c), img->data + ((row + 1) * img->w * img->c) + (col * img->c));
+            }
         }
         printf("%c[0m\n", 0x1B);
     }
