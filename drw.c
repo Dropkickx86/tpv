@@ -72,7 +72,7 @@ int l_pictureprint(lua_State *L){
         for (int col = 0; col < img->w; col++){
             pixel_print(img->data + (row * img->w * img->c) + (col * img->c), img->data + ((row + 1) * img->w * img->c) + (col * img->c), termbg);
         }
-        printf("\n");
+        printf("%c[0m\n", 0x1B);
     }
     endprint();
     free(termbg);
