@@ -6,11 +6,12 @@ int luaopen_drw(lua_State *L);
 
 int main(int argc, char *argv[]) {
     if (argc == 1) {
-        printf("Need file name");
+        printf("Need file name\n");
         return 1;
     }
     else if (argc > 2) {
-        printf("Only provide file name");
+        printf("Only provide file name\n");
+        return 1;
     }
 
     lua_State *L = luaL_newstate();
@@ -24,10 +25,6 @@ int main(int argc, char *argv[]) {
     luaL_loadfile(L, "main.lua");
     lua_pushstring(L, argv[1]);
     lua_pcall(L, 1, 0, 0);
-    
-    /*if (luaL_loadfile(L, "main.lua") || lua_pcall(L, 1, 0, 0)){
-        printf("%s", lua_tostring(L, -1));
-    }*/
 
     lua_close(L);
     return 0;
