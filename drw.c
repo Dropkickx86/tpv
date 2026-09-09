@@ -47,25 +47,19 @@ unsigned char* gettermbg(){
     }
 }
 
-void pixel_print(unsigned char *fg, unsigned char *bg){
-    printf("%c[38;2;%d;%d;%dm", 0x1B, *fg, *(fg + 1), *(fg + 2));
-    printf("%c[48;2;%d;%d;%dm\u2580", 0x1B, *bg, *(bg + 1), *(bg + 2));
+void pixel_print(unsigned char *top, unsigned char *bot){
+    printf("%c[38;2;%d;%d;%dm", 0x1B, *top, *(top + 1), *(top + 2));
+    printf("%c[48;2;%d;%d;%dm\u2580", 0x1B, *bot, *(bot + 1), *(bot + 2));
 }
 
-void pixel_print_4ch(unsigned char *fg, unsigned char *bg, unsigned char *termbg){
-    if (*(fg + 3) != 255){
-        float alpha = (float)*(fg + 3) / 255;
-        *fg = (*fg * alpha) + (*termbg * (1.0 - alpha));
-        *(fg + 1) = (*(fg + 1) * alpha) + (*(termbg + 1) * (1.0 - alpha));
-        *(fg + 2) = (*(fg + 2) * alpha) + (*(termbg + 2) * (1.0 - alpha));
+void alpha_apply(unsigned char *color, unsigned char *termbg, unsigned char a){
+    if (a == 255){
+        return;
     }
-    if (*(bg + 3) != 255){
-        float alpha = (float)*(bg + 3) / 255;
-        *bg = (*bg * alpha) + (*termbg * (1.0 - alpha));
-        *(bg + 1) = (*(bg + 1) * alpha) + (*(termbg + 1) * (1.0 - alpha));
-        *(bg + 2) = (*(bg + 2) * alpha) + (*(termbg + 2) * (1.0 - alpha));
-    }
-    pixel_print(fg ,bg);
+    float alpha = (float)a / 255;
+    color[0] = (color[0] * alpha) + (*termbg * (1.0 - alpha));
+    color[1] = (color[1] * alpha) + (*(termbg + 1) * (1.0 - alpha));
+    color[2] = (color[2] * alpha) + (*(termbg + 2) * (1.0 - alpha));
 }
 
 int l_pictureprint(lua_State *L){
@@ -74,12 +68,29 @@ int l_pictureprint(lua_State *L){
     
     for (int row = 0; row < img->h; row += 2){
         for (int col = 0; col < img->w; col++){
-            if (img->c == 4){
-                pixel_print_4ch(img->data + (row * img->w * img->c) + (col * img->c), img->data + ((row + 1) * img->w * img->c) + (col * img->c), termbg);
+            unsigned char top_rgb[3];
+            unsigned char bot_rgb[3];
+            if (img->c >= 3){
+                top_rgb[0] = *(img->data + (row * img->w * img->c) + (col * img->c));
+                top_rgb[1] = *(img->data + (row * img->w * img->c) + (col * img->c) + 1);
+                top_rgb[2] = *(img->data + (row * img->w * img->c) + (col * img->c) + 2);
+                bot_rgb[0] = *(img->data + ((row + 1) * img->w * img->c) + (col * img->c));
+                bot_rgb[1] = *(img->data + ((row + 1) * img->w * img->c) + (col * img->c) + 1);
+                bot_rgb[2] = *(img->data + ((row + 1) * img->w * img->c) + (col * img->c) + 2);
             }
-            else if (img->c == 3){
-                pixel_print(img->data + (row * img->w * img->c) + (col * img->c), img->data + ((row + 1) * img->w * img->c) + (col * img->c));
+            else {
+                top_rgb[0] = *(img->data + (row * img->w * img->c) + (col * img->c));
+                top_rgb[1] = *(img->data + (row * img->w * img->c) + (col * img->c));
+                top_rgb[2] = *(img->data + (row * img->w * img->c) + (col * img->c));
+                bot_rgb[0] = *(img->data + ((row + 1) * img->w * img->c) + (col * img->c));
+                bot_rgb[1] = *(img->data + ((row + 1) * img->w * img->c) + (col * img->c));
+                bot_rgb[2] = *(img->data + ((row + 1) * img->w * img->c) + (col * img->c));
             }
+            if (img->c == 4 || img->c == 2){
+                alpha_apply(top_rgb, termbg, *(img->data + (row * img->w * img->c) + (col * img->c) + img->c - 1));
+                alpha_apply(bot_rgb, termbg, *(img->data + ((row + 1) * img->w * img->c) + (col * img->c) + img->c - 1));
+            }
+            pixel_print(top_rgb, bot_rgb);
         }
         printf("%c[0m\n", 0x1B);
     }
