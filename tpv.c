@@ -15,9 +15,9 @@ struct arguments {
 static char doc[] = "CLI tool to print images in terminal";
 static char args_doc[] = "filepath";
 static struct argp_option options[] = {
-    {"no-scaling", 'n', 0, 0, "Prints image without scaling it down to fit the terminal window"},
-    {"no-vert-scaling", 'v', 0, 0, "Prints image after scaling it down to fit on width, ignoring image height"},
-    {"help", 'h', 0, 0, "Shows this help list"},
+    {"no-scaling", 'n', 0, 0, "Prints image without scaling it down to fit the terminal window", 0},
+    {"no-vert-scaling", 'v', 0, 0, "Prints image after scaling it down to fit on width, ignoring image height", 0},
+    {"help", 'h', 0, 0, "Shows this help list", 0},
     {0},
 };
 static error_t parse_opt(int key, char *arg, struct argp_state *state){
@@ -32,6 +32,7 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state){
         break;
     case 'h':
         argp_state_help(state, stdout, ARGP_HELP_STD_HELP);
+        break;
     case ARGP_KEY_ARG:
         arguments->filepath = arg;
         break;
@@ -45,7 +46,7 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state){
     }
     return 0;
 }
-static struct argp argp = {options, parse_opt, args_doc, doc};
+static struct argp argp = {options, parse_opt, args_doc, doc, 0, 0, 0};
 
 int luaopen_imageinfo(lua_State *L);
 int luaopen_drw(lua_State *L);
