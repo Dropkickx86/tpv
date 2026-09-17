@@ -4,6 +4,7 @@
 #include <lua.h>
 #include <lauxlib.h>
 #include <unistd.h>
+#include <sys/ioctl.h>
 #include "imageinfo.h"
 
 int l_scrclear(){
@@ -74,9 +75,16 @@ int l_pictureprint(lua_State *L){
                 top_rgb[0] = *(img->data + (row * img->w * img->c) + (col * img->c));
                 top_rgb[1] = *(img->data + (row * img->w * img->c) + (col * img->c) + 1);
                 top_rgb[2] = *(img->data + (row * img->w * img->c) + (col * img->c) + 2);
-                bot_rgb[0] = *(img->data + ((row + 1) * img->w * img->c) + (col * img->c));
-                bot_rgb[1] = *(img->data + ((row + 1) * img->w * img->c) + (col * img->c) + 1);
-                bot_rgb[2] = *(img->data + ((row + 1) * img->w * img->c) + (col * img->c) + 2);
+                if (row + 1 == img->h){
+                    bot_rgb[0] = *(termbg);
+                    bot_rgb[1] = *(termbg + 1);
+                    bot_rgb[2] = *(termbg + 2);
+                }
+                else {
+                    bot_rgb[0] = *(img->data + ((row + 1) * img->w * img->c) + (col * img->c));
+                    bot_rgb[1] = *(img->data + ((row + 1) * img->w * img->c) + (col * img->c) + 1);
+                    bot_rgb[2] = *(img->data + ((row + 1) * img->w * img->c) + (col * img->c) + 2);
+                }
             }
             else {
                 top_rgb[0] = *(img->data + (row * img->w * img->c) + (col * img->c));
@@ -99,9 +107,18 @@ int l_pictureprint(lua_State *L){
     return 0;
 }
 
+int l_getterminfo(lua_State *L){
+    struct winsize term;
+    ioctl(STDOUT_FILENO, TIOCGWINSZ, &term);
+    lua_pushinteger(L, term.ws_col);
+    lua_pushinteger(L, term.ws_row);
+    return 2;
+}
+
 static const luaL_Reg funcs[] = {
     {"scrclear", l_scrclear},
     {"picture_print", l_pictureprint},
+    {"getterminfo", l_getterminfo},
     {NULL, NULL}
 };
 

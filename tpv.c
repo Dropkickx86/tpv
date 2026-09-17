@@ -1,7 +1,5 @@
 #include <lauxlib.h>
 #include <lualib.h>
-//#include <stdlib.h>
-//#include <stdio.h>
 #include <string.h>
 #include <argp.h>
 
@@ -9,6 +7,7 @@ struct arguments {
     char *args[3];
     int no_scaling;
     int no_vert_scaling;
+    int progress;
     char *filepath;
 };
 
@@ -17,6 +16,7 @@ static char args_doc[] = "filepath";
 static struct argp_option options[] = {
     {"no-scaling", 'n', 0, 0, "Prints image without scaling it down to fit the terminal window", 0},
     {"no-vert-scaling", 'v', 0, 0, "Prints image after scaling it down to fit on width, ignoring image height", 0},
+    {"progress", 'p', 0, 0, "Prints the progress when scaling images", 0},
     {"help", 'h', 0, 0, "Shows this help list", 0},
     {0},
 };
@@ -29,6 +29,9 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state){
         break;
     case 'v':
         arguments->no_vert_scaling = 1;
+        break;
+    case 'p':
+        arguments->progress = 1;
         break;
     case 'h':
         argp_state_help(state, stdout, ARGP_HELP_STD_HELP);
@@ -55,6 +58,7 @@ int main(int argc, char **argv) {
     struct arguments arguments;
     arguments.no_scaling = 0;
     arguments.no_vert_scaling = 0;
+    arguments.progress = 0;
     arguments.filepath = "";
     argp_parse(&argp, argc, argv, ARGP_NO_HELP, 0, &arguments);
 
@@ -70,7 +74,8 @@ int main(int argc, char **argv) {
     lua_pushstring(L, arguments.filepath);
     lua_pushinteger(L, arguments.no_scaling);
     lua_pushinteger(L, arguments.no_vert_scaling);
-    lua_pcall(L, 3, 0, 0);
+    lua_pushinteger(L, arguments.progress);
+    lua_pcall(L, 4, 0, 0);
 
     lua_close(L);
     return 0;
