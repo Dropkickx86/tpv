@@ -48,6 +48,12 @@ unsigned char* gettermbg(){
     }
 }
 
+struct winsize getterminfo(){
+    struct winsize term;
+    ioctl(STDOUT_FILENO, TIOCGWINSZ, &term);
+    return term;
+}
+
 void pixel_print(unsigned char *top, unsigned char *bot){
     printf("%c[38;2;%d;%d;%dm", 0x1B, *top, *(top + 1), *(top + 2));
     printf("%c[48;2;%d;%d;%dm\u2580", 0x1B, *bot, *(bot + 1), *(bot + 2));
@@ -66,9 +72,13 @@ void alpha_apply(unsigned char *color, unsigned char *termbg, unsigned char a){
 int l_pictureprint(lua_State *L){
     ImageInfo *img = (ImageInfo *)luaL_checkudata(L, 1, IMAGEINFO_MT);
     unsigned char *termbg = gettermbg();
+    struct winsize term = getterminfo();
     
     for (int row = 0; row < img->h; row += 2){
         for (int col = 0; col < img->w; col++){
+            if (col >= term.ws_col) {
+                break;
+            }
             unsigned char top_rgb[3];
             unsigned char bot_rgb[3];
             if (img->c >= 3){
@@ -108,8 +118,7 @@ int l_pictureprint(lua_State *L){
 }
 
 int l_getterminfo(lua_State *L){
-    struct winsize term;
-    ioctl(STDOUT_FILENO, TIOCGWINSZ, &term);
+    struct winsize term = getterminfo();
     lua_pushinteger(L, term.ws_col);
     lua_pushinteger(L, term.ws_row);
     return 2;
