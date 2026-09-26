@@ -1,9 +1,15 @@
 local imageinfo = require("imageinfo")
 local drw = require("drw")
 
-local filename, no_scaling, no_vert_scaling, progress = ...
+local filename, fast, no_scaling, no_vert_scaling, progress = ...
 local termw, termh = drw.getterminfo()
 local img = imageinfo.load(filename)
+
+if fast == 1 then
+    drw.scrclear()
+    drw.fastprint(img)
+    return
+end
 
 if no_scaling ~= 1 then
     io.write('[')

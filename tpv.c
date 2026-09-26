@@ -4,7 +4,8 @@
 #include <argp.h>
 
 struct arguments {
-    char *args[3];
+    char *args[4];
+    int fast;
     int no_scaling;
     int no_vert_scaling;
     int progress;
@@ -14,6 +15,7 @@ struct arguments {
 static char doc[] = "CLI tool to print images in terminal";
 static char args_doc[] = "filepath";
 static struct argp_option options[] = {
+    {"fast", 'f', 0, 0, "Prints image by skipping pixels instead of scaling. Fast but inaccurate", 0},
     {"no-scaling", 'n', 0, 0, "Prints image without scaling it down to fit the terminal window", 0},
     {"no-vert-scaling", 'v', 0, 0, "Prints image after scaling it down to fit on width, ignoring image height", 0},
     {"progress", 'p', 0, 0, "Prints the progress when scaling images", 0},
@@ -24,6 +26,9 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state){
     struct arguments *arguments = state->input;
 
     switch (key) {
+    case 'f':
+        arguments->fast = 1;
+        break;
     case 'n':
         arguments->no_scaling = 1;
         break;
@@ -56,6 +61,7 @@ int luaopen_drw(lua_State *L);
 
 int main(int argc, char **argv) {
     struct arguments arguments;
+    arguments.fast = 0;
     arguments.no_scaling = 0;
     arguments.no_vert_scaling = 0;
     arguments.progress = 0;
@@ -72,10 +78,11 @@ int main(int argc, char **argv) {
 
     luaL_loadfile(L, "main.lua");
     lua_pushstring(L, arguments.filepath);
+    lua_pushinteger(L, arguments.fast);
     lua_pushinteger(L, arguments.no_scaling);
     lua_pushinteger(L, arguments.no_vert_scaling);
     lua_pushinteger(L, arguments.progress);
-    lua_pcall(L, 4, 0, 0);
+    lua_pcall(L, 5, 0, 0);
 
     lua_close(L);
     return 0;
