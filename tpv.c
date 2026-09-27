@@ -8,6 +8,7 @@ struct arguments {
     int fast;
     int no_scaling;
     int no_vert_scaling;
+    int arg_inline;
     int progress;
     char *filepath;
 };
@@ -18,6 +19,7 @@ static struct argp_option options[] = {
     {"fast", 'f', 0, 0, "Prints image by skipping pixels instead of scaling. Fast but inaccurate", 0},
     {"no-scaling", 'n', 0, 0, "Prints image without scaling it down to fit the terminal window", 0},
     {"no-vert-scaling", 'v', 0, 0, "Prints image after scaling it down to fit on width, ignoring image height", 0},
+    {"inline", 'i', 0, 0, "Prints without clearing the screen", 0},
     {"progress", 'p', 0, 0, "Prints the progress when scaling images", 0},
     {"help", 'h', 0, 0, "Shows this help list", 0},
     {0},
@@ -34,6 +36,9 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state){
         break;
     case 'v':
         arguments->no_vert_scaling = 1;
+        break;
+    case 'i':
+        arguments->arg_inline = 1;
         break;
     case 'p':
         arguments->progress = 1;
@@ -64,6 +69,7 @@ int main(int argc, char **argv) {
     arguments.fast = 0;
     arguments.no_scaling = 0;
     arguments.no_vert_scaling = 0;
+    arguments.arg_inline = 0;
     arguments.progress = 0;
     arguments.filepath = "";
     argp_parse(&argp, argc, argv, ARGP_NO_HELP, 0, &arguments);
@@ -81,8 +87,9 @@ int main(int argc, char **argv) {
     lua_pushinteger(L, arguments.fast);
     lua_pushinteger(L, arguments.no_scaling);
     lua_pushinteger(L, arguments.no_vert_scaling);
+    lua_pushinteger(L, arguments.arg_inline);
     lua_pushinteger(L, arguments.progress);
-    lua_pcall(L, 5, 0, 0);
+    lua_pcall(L, 6, 0, 0);
 
     lua_close(L);
     return 0;

@@ -1,38 +1,40 @@
 local imageinfo = require("imageinfo")
 local drw = require("drw")
 
-local filename, fast, no_scaling, no_vert_scaling, progress = ...
+local filename, fast, no_scaling, no_vert_scaling, inline, progress = ...
 local termw, termh = drw.getterminfo()
 local img = imageinfo.load(filename)
 
 if fast == 1 then
-    drw.scrclear()
-    drw.fastprint(img)
-    return
+    goto render
 end
 
 if no_scaling ~= 1 then
-    io.write('[')
-    for i=1,20,1 do
-        io.write('-')
+    local total_index, actions;
+    if progress == 1 then
+        io.write('[')
+        for i=1,20,1 do
+            io.write('-')
+        end
+        io.write(']')
+        io.flush()
+        total_index = 0
+        actions = 0
+        local final_h = img.h
+        local final_w = img.w
+        while final_w > termw or (no_vert_scaling ~= 1 and final_h > (termh * 2)) do
+            final_w = math.ceil(final_w / 2)
+            final_h = math.ceil(final_h / 2)
+        end
+        local cur_h = img.h
+        local cur_w = img.w
+        while cur_w > final_w do
+            cur_h = math.ceil(cur_h / 2)
+            cur_w = math.ceil(cur_w / 2)
+            total_index = total_index + (cur_h * cur_w * img.c)
+        end
     end
-    io.write(']')
-    io.flush()
-    local total_index = 0
-    local actions = 0
-    local final_h = img.h
-    local final_w = img.w
-    while final_w > termw or (no_vert_scaling ~= 1 and final_h > (termh * 2)) do
-        final_w = math.ceil(final_w / 2)
-        final_h = math.ceil(final_h / 2)
-    end
-    local cur_h = img.h
-    local cur_w = img.w
-    while cur_w > final_w do
-        cur_h = math.ceil(cur_h / 2)
-        cur_w = math.ceil(cur_w / 2)
-        total_index = total_index + (cur_h * cur_w * img.c)
-    end
+    
     
     while img.w > termw or (no_vert_scaling ~= 1 and img.h > (termh * 2)) do
         local row = 0
@@ -62,24 +64,26 @@ if no_scaling ~= 1 then
                         img[(col * img.c) + ((row + 1) * img.w * img.c) + channel + img.c]
                         ) / 4) + 0.5)
                     end
-                    if progress == 1 and actions % 100000 == 0 then
-                        io.write("\r\027[K")
-                        io.flush()
-                        io.write('[')
-                        local perc = math.floor((actions / total_index) * 100)
-                        local filled = 0
-                        while perc > 5 do
-                            io.write('#')
-                            perc = perc - 5
-                            filled = filled + 1
+                    if progress == 1 then
+                        if actions % 100000 == 0 then
+                            io.write("\r\027[K")
+                            io.flush()
+                            io.write('[')
+                            local perc = math.floor((actions / total_index) * 100)
+                            local filled = 0
+                            while perc > 5 do
+                                io.write('#')
+                                perc = perc - 5
+                                filled = filled + 1
+                            end
+                            for _=filled,20,1 do
+                                io.write('-')
+                            end
+                            io.write(']')
+                            io.flush()
                         end
-                        for i=filled,20,1 do
-                            io.write('-')
-                        end
-                        io.write(']')
-                        io.flush()
+                        actions = actions + 1
                     end
-                    actions = actions + 1
                     channel = channel + 1
                     index = index + 1
                 end
@@ -92,6 +96,8 @@ if no_scaling ~= 1 then
     end
 end
 
-drw.scrclear()
-drw.picture_print(img)
-
+::render::
+if inline ~= 1 then
+    drw.scrclear()
+end
+drw.picture_print(img, fast)

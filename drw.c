@@ -73,10 +73,20 @@ int l_pictureprint(lua_State *L){
     ImageInfo *img = (ImageInfo *)luaL_checkudata(L, 1, IMAGEINFO_MT);
     unsigned char *termbg = gettermbg();
     struct winsize term = getterminfo();
+    int offset = 1;
+    if (luaL_checknumber(L, 2) == 1) {
+        if (img->w / term.ws_col > img->h / term.ws_row) {
+            offset += img->w / term.ws_col;
+        }
+        else {
+            offset += img->h / term.ws_row;
+        }
+    }
     
-    for (int row = 0; row < img->h; row += 2){
-        for (int col = 0; col < img->w; col++){
-            if (col >= term.ws_col) {
+    for (int row = 0; row < img->h; row += (offset * 2)){
+        int col_out = 0;
+        for (int col = 0; col < img->w; col += offset){
+            if (col_out >= term.ws_col) {
                 break;
             }
             unsigned char top_rgb[3];
@@ -109,58 +119,7 @@ int l_pictureprint(lua_State *L){
                 alpha_apply(bot_rgb, termbg, *(img->data + ((row + 1) * img->w * img->c) + (col * img->c) + img->c - 1));
             }
             pixel_print(top_rgb, bot_rgb);
-        }
-        printf("%c[0m\n", 0x1B);
-    }
-    endprint();
-    free(termbg);
-    return 0;
-}
-
-int l_fastprint(lua_State *L){
-    ImageInfo *img = (ImageInfo *)luaL_checkudata(L, 1, IMAGEINFO_MT);
-    unsigned char *termbg = gettermbg();
-    struct winsize term = getterminfo();
-    int offset = 1;
-    if (img->w / term.ws_col > img->h / term.ws_row) {
-        offset += img->w / term.ws_col;
-    }
-    else {
-        offset += img->h / term.ws_row;
-    }
-    
-    for (int row = 0; row < img->h; row += (offset * 2)){
-        for (int col = 0; col < img->w; col += offset){
-            unsigned char top_rgb[3];
-            unsigned char bot_rgb[3];
-            if (img->c >= 3){
-                top_rgb[0] = *(img->data + (row * img->w * img->c) + (col * img->c));
-                top_rgb[1] = *(img->data + (row * img->w * img->c) + (col * img->c) + 1);
-                top_rgb[2] = *(img->data + (row * img->w * img->c) + (col * img->c) + 2);
-                if (row + 1 == img->h){
-                    bot_rgb[0] = *(termbg);
-                    bot_rgb[1] = *(termbg + 1);
-                    bot_rgb[2] = *(termbg + 2);
-                }
-                else {
-                    bot_rgb[0] = *(img->data + ((row + 1) * img->w * img->c) + (col * img->c));
-                    bot_rgb[1] = *(img->data + ((row + 1) * img->w * img->c) + (col * img->c) + 1);
-                    bot_rgb[2] = *(img->data + ((row + 1) * img->w * img->c) + (col * img->c) + 2);
-                }
-            }
-            else {
-                top_rgb[0] = *(img->data + (row * img->w * img->c) + (col * img->c));
-                top_rgb[1] = *(img->data + (row * img->w * img->c) + (col * img->c));
-                top_rgb[2] = *(img->data + (row * img->w * img->c) + (col * img->c));
-                bot_rgb[0] = *(img->data + ((row + 1) * img->w * img->c) + (col * img->c));
-                bot_rgb[1] = *(img->data + ((row + 1) * img->w * img->c) + (col * img->c));
-                bot_rgb[2] = *(img->data + ((row + 1) * img->w * img->c) + (col * img->c));
-            }
-            if (img->c == 4 || img->c == 2){
-                alpha_apply(top_rgb, termbg, *(img->data + (row * img->w * img->c) + (col * img->c) + img->c - 1));
-                alpha_apply(bot_rgb, termbg, *(img->data + ((row + 1) * img->w * img->c) + (col * img->c) + img->c - 1));
-            }
-            pixel_print(top_rgb, bot_rgb);
+            col_out++;
         }
         printf("%c[0m\n", 0x1B);
     }
@@ -179,7 +138,6 @@ int l_getterminfo(lua_State *L){
 static const luaL_Reg funcs[] = {
     {"scrclear", l_scrclear},
     {"picture_print", l_pictureprint},
-    {"fastprint", l_fastprint},
     {"getterminfo", l_getterminfo},
     {NULL, NULL}
 };
