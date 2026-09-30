@@ -4,6 +4,12 @@
 #include "stb_image.h"
 #include "imageinfo.h"
 
+static int index_resolve(ImageInfo *img, int row, int col, int ch, int w_target) {
+    if (w_target == 0) {
+        w_target = img->w;
+    }
+    return ((((row - 1) * w_target * img->c) + ((col - 1) * img->c) + ch) - 1);
+}
 
 static int l_load(lua_State *L) {
     const char *path = luaL_checkstring(L, 1);
@@ -77,6 +83,34 @@ static int l_newindex(lua_State *L) {
     return 1;
 }
 
+static int l_set(lua_State *L) {
+    ImageInfo *img = (ImageInfo *)luaL_checkudata(L, 1, IMAGEINFO_MT);
+    int row = lua_tointeger(L, 2);
+    int col = lua_tointeger(L, 3);
+    int ch = lua_tointeger(L, 4);
+    int val = lua_tointeger(L, 5);
+    int w_target = lua_tointeger(L, 6);
+    luaL_argcheck(L, row > 0 || row <= img->h, 2, "OOB");
+    luaL_argcheck(L, col > 0 || col <= img->w, 3, "OOB");
+    luaL_argcheck(L, ch > 0 || ch <= img->c, 4, "OOB");
+    luaL_argcheck(L, val >= 0 || val <= 255, 5, "Invalid value");
+    luaL_argcheck(L, w_target >= 0 || w_target <= img->w, 6, "Invalid value");
+    img->data[index_resolve(img, row, col, ch, w_target)] = val;
+    return 0;
+}
+
+int l_get(lua_State *L) {
+    ImageInfo *img = (ImageInfo *)luaL_checkudata(L, 1, IMAGEINFO_MT);
+    int row = lua_tointeger(L, 2);
+    int col = lua_tointeger(L, 3);
+    int ch = lua_tointeger(L, 4);
+    luaL_argcheck(L, row > 0 || row <= img->h, 2, "OOB");
+    luaL_argcheck(L, col > 0 || col <= img->w, 3, "OOB");
+    luaL_argcheck(L, ch > 0 || ch <= img->c, 4, "OOB");
+    lua_pushinteger(L, img->data[index_resolve(img, row, col, ch, 0)]);
+    return 1;
+}
+
 static int l_gc(lua_State *L) {
     ImageInfo *img = (ImageInfo *)luaL_checkudata(L, 1, IMAGEINFO_MT);
     stbi_image_free(img->data);
@@ -92,6 +126,8 @@ static const luaL_Reg meta[] = {
 
 static const luaL_Reg funcs[] = {
     {"load", l_load},
+    {"set", l_set},
+    {"get", l_get},
     {NULL, NULL}
 };
 
