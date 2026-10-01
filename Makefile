@@ -1,13 +1,8 @@
 CC = gcc
-LUA_PKG := $(shell if pkg-config --exists lua; then echo lua; \
-					elif pkg-config --exists lua5.4; then echo lua5.4; \
-					elif pkg-config --exists lua5.3; then echo lua5.3; \
-					elif pkg-config --exists lua5.2; then echo lua5.2; \
-					elif pkg-config --exists lua5.1; then echo lua5.1; fi)
-CFLAGS = -std=c99 -pedantic -Wall -Wextra $(shell pkg-config --cflags $(LUA_PKG))
-LDFLAGS = -lm $(shell pkg-config --libs $(LUA_PKG))
+CFLAGS = -std=c99 -pedantic -Wall -Wextra
+LDFLAGS = -lm
 
-SRC = tpv.c imageinfo.c drw.c
+SRC = tpv.c
 OBJ = $(SRC:.c=.o)
 TARGET = tpv
 
@@ -19,8 +14,6 @@ $(TARGET): $(OBJ)
 
 %.so: %.c
 	$(CC) -shared -fPIC $(CFLAGS) $< -o $@
-
-support: imageinfo.so drw.so
 
 clean:
 	rm -f $(OBJ) $(TARGET)
