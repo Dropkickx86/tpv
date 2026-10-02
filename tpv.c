@@ -131,12 +131,13 @@ struct winsize getterminfo(){
 }
 
 void image_scale(ImageInfo *img, int scalefactor, int progress){
-    int finalIndex;
+    int finalIndex, cursor = 5;
     if (progress){
         float h = ceil((float)img->h / (float)scalefactor);
         float w = ceil((float)img->w / (float)scalefactor);
         finalIndex = (int) h * (int) w * img->c;
         printf("[--------------------]");
+        printf("%c[2G", 0x1B);
     }
     int index = 0;
     for (int row = 0; row < img->h; row += scalefactor){
@@ -156,15 +157,11 @@ void image_scale(ImageInfo *img, int scalefactor, int progress){
                 }
                 img->data[index++] = val / amount;
                 if (progress && index % 500 == 0){
-                    int perc = (int)(((float)index / (float)finalIndex) * 100);
-                    printf("\r[");
-                    for (int i = 5; i < perc; i += 5){
+                    float perc = ((float)index / (float)finalIndex) * 100;
+                    if (perc >= cursor) {
                         printf("#");
+                        cursor += 5;
                     }
-                    for (perc; perc <= 100; perc += 5){
-                        printf("-");
-                    }
-                    printf("]");
                 }
             }
         }
