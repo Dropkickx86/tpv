@@ -64,8 +64,8 @@ int main(int argc, char **argv){
     }
     if (!arguments.no_scaling){
         int scalefactor;
-        if (!arguments.no_vert_scaling && (img.h / (term.ws_row * 2)) > (img.w / term.ws_col)){
-            scalefactor = (img.h / (term.ws_row * 2)) + 1;
+        if (!arguments.no_vert_scaling && (img.h / ((term.ws_row - 1) * 2)) > (img.w / term.ws_col)){
+            scalefactor = (img.h / ((term.ws_row - 1) * 2)) + 1;
         }
         else {
             scalefactor = (img.w / term.ws_col) + 1;
