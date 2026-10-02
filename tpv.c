@@ -27,7 +27,7 @@ void alpha_apply(unsigned char *color, unsigned char *termbg, unsigned char a);
 void endprint();
 unsigned char* gettermbg();
 struct winsize getterminfo();
-void image_scale(ImageInfo *img, int scalefactor);
+void image_scale(ImageInfo *img, int scalefactor, int progress);
 error_t parse_opt(int key, char *arg, struct argp_state *state);
 void pictureprint(ImageInfo *img, int fast);
 void pixel_print(unsigned char *top, unsigned char *bot);
@@ -71,7 +71,7 @@ int main(int argc, char **argv){
             scalefactor = (img.w / term.ws_col) + 1;
         }
         if (scalefactor > 1){
-            image_scale(&img, scalefactor);
+            image_scale(&img, scalefactor, arguments.progress);
         }
     }
 
@@ -130,7 +130,14 @@ struct winsize getterminfo(){
     return term;
 }
 
-void image_scale(ImageInfo *img, int scalefactor){
+void image_scale(ImageInfo *img, int scalefactor, int progress){
+    int finalIndex;
+    if (progress){
+        float h = ceil((float)img->h / (float)scalefactor);
+        float w = ceil((float)img->w / (float)scalefactor);
+        finalIndex = (int) h * (int) w * img->c;
+        printf("[--------------------]");
+    }
     int index = 0;
     for (int row = 0; row < img->h; row += scalefactor){
         for (int col = 0; col < img->w; col += scalefactor){
@@ -148,13 +155,27 @@ void image_scale(ImageInfo *img, int scalefactor){
                     rowoffset++;
                 }
                 img->data[index++] = val / amount;
+                if (progress && index % 500 == 0){
+                    int perc = (int)(((float)index / (float)finalIndex) * 100);
+                    printf("\r[");
+                    for (int i = 5; i < perc; i += 5){
+                        printf("#");
+                    }
+                    for (perc; perc <= 100; perc += 5){
+                        printf("-");
+                    }
+                    printf("]");
+                }
             }
         }
     }
-    float h = ceil(img->h / scalefactor);
-    float w = ceil(img->w / scalefactor);
+    float h = ceil((float)img->h / (float)scalefactor);
+    float w = ceil((float)img->w / (float)scalefactor);
     img->h = (int) h;
     img->w = (int) w;
+    if (progress){
+        printf("\n");
+    }
 }
 
 error_t parse_opt(int key, char *arg, struct argp_state *state){
