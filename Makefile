@@ -1,5 +1,6 @@
 CC = gcc
-CFLAGS = -std=c99 -pedantic -Wall -Wextra
+CFLAGS = -std=c99 -O2 -pedantic -Wall -Wextra
+CFLAGS_DEBUG = -std=c99 -O0 -g -fno-omit-frame-pointer
 LDFLAGS = -lm
 
 SRC = tpv.c
@@ -12,8 +13,8 @@ $(TARGET): $(OBJ)
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-%.so: %.c
-	$(CC) -shared -fPIC $(CFLAGS) $< -o $@
+debug:
+	$(CC) $(SRC) -o $(TARGET).debug $(CFLAGS_DEBUG) $(LDFLAGS)
 
 clean:
 	rm -f $(OBJ) $(TARGET)
