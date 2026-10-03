@@ -67,10 +67,8 @@ int main(int argc, char **argv){
     unsigned char termbg[3] = {0};
     gettermbg(termbg);
 
-    if (arguments.fast){
-        goto render;
-    }
-    if (!arguments.no_scaling){
+    //scaling
+    if (!arguments.no_scaling && !arguments.fast){
         int scalefactor;
         if (!arguments.no_vert_scaling && (img.h / (term.ws_row * 2)) > (img.w / term.ws_col)){
             scalefactor = (img.h / (term.ws_row * 2)) + 1;
@@ -83,6 +81,7 @@ int main(int argc, char **argv){
         }
     }
 
+    //alpha
     if (img.c == 2 || img.c == 4){
         for (int pixel = 0; pixel < (img.h * img.w * img.c); pixel += img.c){
             for (int offset = 0; offset < img.c - 1; offset++){
@@ -91,7 +90,7 @@ int main(int argc, char **argv){
         }
     }
 
-    render:
+    //render
     if (!arguments.arg_inline){
         scrclear();
     }
@@ -112,6 +111,8 @@ int main(int argc, char **argv){
         }
     }
     picture_print_24bit(&img, &term, arguments.fast);
+
+    //cleanup
     free(img.data);
     return 0;
 }
