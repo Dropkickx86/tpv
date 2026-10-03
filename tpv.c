@@ -23,14 +23,14 @@ typedef struct {
     unsigned char *data;
 } ImageInfo;
 
-void alpha_apply(unsigned char *color, unsigned char *termbg, unsigned char a);
+unsigned char alpha_apply(unsigned char color, unsigned char bg, unsigned char a);
 void endprint();
-unsigned char* gettermbg();
+void gettermbg(unsigned char *bg_col);
 struct winsize getterminfo();
 void image_scale(ImageInfo *img, int scalefactor, int progress);
 error_t parse_opt(int key, char *arg, struct argp_state *state);
-void pictureprint(ImageInfo *img, int fast);
-void pixel_print(unsigned char *top, unsigned char *bot);
+void picture_print_24bit(ImageInfo *img, const struct winsize *term, int fast);
+void pixel_print_24bit(unsigned char *top, unsigned char *bot, int ch_single);
 int scrclear();
 
 char doc[] = "CLI tool to print images in terminal";
@@ -58,14 +58,17 @@ int main(int argc, char **argv){
 
     ImageInfo img;
     img.data = stbi_load(arguments.filepath, &img.w, &img.h, &img.c, 0);
-    struct winsize term = getterminfo();
+    const struct winsize term = getterminfo();
+    unsigned char termbg[3] = {0};
+    gettermbg(termbg);
+
     if (arguments.fast){
         goto render;
     }
     if (!arguments.no_scaling){
         int scalefactor;
-        if (!arguments.no_vert_scaling && (img.h / ((term.ws_row - 1) * 2)) > (img.w / term.ws_col)){
-            scalefactor = (img.h / ((term.ws_row - 1) * 2)) + 1;
+        if (!arguments.no_vert_scaling && (img.h / (term.ws_row * 2)) > (img.w / term.ws_col)){
+            scalefactor = (img.h / (term.ws_row * 2)) + 1;
         }
         else {
             scalefactor = (img.w / term.ws_col) + 1;
@@ -75,29 +78,52 @@ int main(int argc, char **argv){
         }
     }
 
+    if (img.c == 2 || img.c == 4){
+        for (int pixel = 0; pixel < (img.h * img.w * img.c); pixel += img.c){
+            for (int offset = 0; offset < img.c - 1; offset++){
+                img.data[pixel + offset] = alpha_apply(img.data[pixel + offset], termbg[offset], img.data[pixel + img.c - 1]);
+            }
+        }
+    }
+
     render:
     if (!arguments.arg_inline){
         scrclear();
     }
-    pictureprint(&img, arguments.fast);
+    if (img.h % 2 != 0){
+        unsigned char *temp = realloc(img.data, sizeof(unsigned char) * ((img.w * img.h * img.c) + (img.w * img.c)));
+        if (temp){
+            img.data = temp;
+            for (int pixel = (img.w * img.h * img.c); pixel < ((img.w * img.h * img.c) + (img.w * img.c)); pixel += img.c){
+                for (int ch = 0; ch < img.c; ch++){
+                    if (ch == img.c){
+                        img.data[pixel + ch] = 255;
+                    }
+                    else{
+                        img.data[pixel + ch] = termbg[ch];
+                    }
+                }
+            }
+        }
+    }
+    picture_print_24bit(&img, &term, arguments.fast);
+    free(img.data);
     return 0;
 }
 
-void alpha_apply(unsigned char *color, unsigned char *termbg, unsigned char a){
-    if (a == 255){
-        return;
+unsigned char alpha_apply(unsigned char color, unsigned char bg, unsigned char a){
+    if (a != 255){
+        float alpha = (float)a / 255;
+        color = (color * alpha) + (bg * (1.0 - alpha));
     }
-    float alpha = (float)a / 255;
-    color[0] = (color[0] * alpha) + (*termbg * (1.0 - alpha));
-    color[1] = (color[1] * alpha) + (*(termbg + 1) * (1.0 - alpha));
-    color[2] = (color[2] * alpha) + (*(termbg + 2) * (1.0 - alpha));
+    return color;
 }
 
 void endprint(){
     printf("%c[0m", 0x1B);
 }
 
-unsigned char* gettermbg(){
+void gettermbg(unsigned char *bg_col){
     struct termios old_term, raw_term;
     tcgetattr(STDIN_FILENO, &old_term);
     raw_term = old_term;
@@ -111,22 +137,23 @@ unsigned char* gettermbg(){
     int n = read(STDIN_FILENO, buf, sizeof(buf) - 1);
     tcsetattr(STDIN_FILENO, TCSANOW, &old_term);
     if (n > 0){
-        unsigned char *result = malloc(3 * sizeof(char));
         unsigned int r, g, b;
         sscanf(buf, "\033]11;rgb:%x/%x/%x", &r, &g, &b);
-        result[0] = (unsigned char)(r >> 8);
-        result[1] = (unsigned char)(g >> 8);
-        result[2] = (unsigned char)(b >> 8);
-        return result;
+        bg_col[0] = (unsigned char)(r >> 8);
+        bg_col[1] = (unsigned char)(g >> 8);
+        bg_col[2] = (unsigned char)(b >> 8);
+        return;
     }
     else {
-        return 0;
+        bg_col = NULL;
+        return;
     }
 }
 
 struct winsize getterminfo(){
     struct winsize term;
     ioctl(STDOUT_FILENO, TIOCGWINSZ, &term);
+    term.ws_row -= 1;
     return term;
 }
 
@@ -210,66 +237,44 @@ error_t parse_opt(int key, char *arg, struct argp_state *state){
     return 0;
 }
 
-void pictureprint(ImageInfo *img, int fast){
-    unsigned char *termbg = gettermbg();
-    struct winsize term = getterminfo();
+void picture_print_24bit(ImageInfo *img, const struct winsize *term, int fast){
     int offset = 1;
+    int ch_single = 0;
+    if (img->c < 3){
+        ch_single = 1;
+    }
     if (fast){
-        if (img->w / term.ws_col > img->h / term.ws_row){
-            offset += img->w / term.ws_col;
+        if (img->w / term->ws_col > img->h / term->ws_row){
+            offset += img->w / term->ws_col;
         }
         else {
-            offset += img->h / term.ws_row;
+            offset += img->h / term->ws_row;
         }
     }
     
     for (int row = 0; row < img->h; row += (offset * 2)){
         int col_out = 0;
         for (int col = 0; col < img->w; col += offset){
-            if (col_out >= term.ws_col) {
+            if (col_out >= term->ws_col) {
                 break;
             }
-            unsigned char top_rgb[3];
-            unsigned char bot_rgb[3];
-            if (img->c >= 3){
-                top_rgb[0] = *(img->data + (row * img->w * img->c) + (col * img->c));
-                top_rgb[1] = *(img->data + (row * img->w * img->c) + (col * img->c) + 1);
-                top_rgb[2] = *(img->data + (row * img->w * img->c) + (col * img->c) + 2);
-                if (row + 1 == img->h){
-                    bot_rgb[0] = *(termbg);
-                    bot_rgb[1] = *(termbg + 1);
-                    bot_rgb[2] = *(termbg + 2);
-                }
-                else {
-                    bot_rgb[0] = *(img->data + ((row + 1) * img->w * img->c) + (col * img->c));
-                    bot_rgb[1] = *(img->data + ((row + 1) * img->w * img->c) + (col * img->c) + 1);
-                    bot_rgb[2] = *(img->data + ((row + 1) * img->w * img->c) + (col * img->c) + 2);
-                }
-            }
-            else {
-                top_rgb[0] = *(img->data + (row * img->w * img->c) + (col * img->c));
-                top_rgb[1] = *(img->data + (row * img->w * img->c) + (col * img->c));
-                top_rgb[2] = *(img->data + (row * img->w * img->c) + (col * img->c));
-                bot_rgb[0] = *(img->data + ((row + 1) * img->w * img->c) + (col * img->c));
-                bot_rgb[1] = *(img->data + ((row + 1) * img->w * img->c) + (col * img->c));
-                bot_rgb[2] = *(img->data + ((row + 1) * img->w * img->c) + (col * img->c));
-            }
-            if (img->c == 4 || img->c == 2){
-                alpha_apply(top_rgb, termbg, *(img->data + (row * img->w * img->c) + (col * img->c) + img->c - 1));
-                alpha_apply(bot_rgb, termbg, *(img->data + ((row + 1) * img->w * img->c) + (col * img->c) + img->c - 1));
-            }
-            pixel_print(top_rgb, bot_rgb);
+            pixel_print_24bit(img->data + (row * img->w * img->c) + (col * img->c), img->data + ((row + 1) * img->w * img->c) + (col * img->c), ch_single);
             col_out++;
         }
         printf("%c[0m\n", 0x1B);
     }
     endprint();
-    free(termbg);
 }
 
-void pixel_print(unsigned char *top, unsigned char *bot){
-    printf("%c[38;2;%d;%d;%dm", 0x1B, *top, *(top + 1), *(top + 2));
-    printf("%c[48;2;%d;%d;%dm\u2580", 0x1B, *bot, *(bot + 1), *(bot + 2));
+void pixel_print_24bit(unsigned char *top, unsigned char *bot, int ch_single){
+    if (ch_single){
+        printf("%c[38;2;%d;%d;%dm", 0x1B, *top, *top, *top);
+        printf("%c[48;2;%d;%d;%dm\u2580", 0x1B, *bot, *bot, *bot);
+    }
+    else{
+        printf("%c[38;2;%d;%d;%dm", 0x1B, *top, *(top + 1), *(top + 2));
+        printf("%c[48;2;%d;%d;%dm\u2580", 0x1B, *bot, *(bot + 1), *(bot + 2));
+    }   
 }
 
 int scrclear(){
