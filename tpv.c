@@ -25,13 +25,13 @@ typedef struct {
 } ImageInfo;
 
 unsigned char alpha_apply(unsigned char color, unsigned char bg, unsigned char a);
-unsigned char convert_color_8bit(unsigned char *value);
+unsigned char convert_8bit(unsigned char r, unsigned char g, unsigned char b);
+unsigned char convert_color_8bit(unsigned char r, unsigned char g, unsigned char b);
 unsigned char convert_grayscale_8bit(unsigned char value);
 void endprint();
 float euclidean_3D(unsigned char *p1, unsigned char *p2);
 void gettermbg(unsigned char *bg_col);
 struct winsize getterminfo();
-void image_convert_8bit(ImageInfo *img);
 void image_scale(ImageInfo *img, int scalefactor, int progress);
 error_t parse_opt(int key, char *arg, struct argp_state *state);
 void picture_print_24bit(ImageInfo *img, const struct winsize *term, int fast);
@@ -125,11 +125,37 @@ unsigned char alpha_apply(unsigned char color, unsigned char bg, unsigned char a
     return color;
 }
 
-unsigned char convert_color_8bit(unsigned char *value){
-    float r = roundf((float)value[0] / 255 * 5);
-    float g = roundf((float)value[1] / 255 * 5);
-    float b = roundf((float)value[2] / 255 * 5);
-    return (unsigned char) 16 + (36 * r) + (6 * g) + b;
+unsigned char convert_8bit(unsigned char r, unsigned char g, unsigned char b){
+    if (r == g && r == b){
+        return convert_grayscale_8bit(r);
+    }
+    else if (abs(r - g) < 12 && abs(g - b) < 12 && abs(r - b) < 12){
+        unsigned char gray_index = convert_grayscale_8bit((unsigned char) (((int) r + (int) g + (int) b) / 3));
+        unsigned char color_index = convert_color_8bit(r, g, b);
+        unsigned char val_color[3], val_gray[3] = {8 + 10 * (gray_index - 232)};
+        val_color[0] = (color_index - 16) / 36;
+        val_color[1] = ((color_index - 16) / 6) % 6;
+        val_color[2] = (color_index - 16) % 6;
+        unsigned char temp_color[3] = {r, g, b};
+        float dist_gray = euclidean_3D(temp_color, val_gray);
+        float dist_color = euclidean_3D(temp_color, val_color);
+        if (dist_gray < dist_color){
+            return gray_index;
+        }
+        else{
+            return color_index;
+        }
+    }
+    else{
+        return convert_color_8bit(r, g, b);
+    }
+}
+
+unsigned char convert_color_8bit(unsigned char r, unsigned char g, unsigned char b){
+    float r_val = roundf((float) r / 255 * 5);
+    float g_val = roundf((float) g / 255 * 5);
+    float b_val = roundf((float) b / 255 * 5);
+    return (unsigned char) 16 + (36 * r_val) + (6 * g_val) + b_val;
 }
 
 unsigned char convert_grayscale_8bit(unsigned char value){
@@ -188,34 +214,6 @@ struct winsize getterminfo(){
     ioctl(STDOUT_FILENO, TIOCGWINSZ, &term);
     term.ws_row -= 1;
     return term;
-}
-
-void image_convert_8bit(ImageInfo *img){
-    int index = 0;
-    for (int pixel = 0; pixel < (img->h * img->w * img->c); pixel += img->c){
-        if (img->c < 3 || (img->data[pixel] == img->data[pixel + 1] && img->data[index] == img->data[index + 2])){
-            img->data[index++] = convert_grayscale_8bit(img->data[pixel]);
-        }
-        else if (abs(img->data[pixel] - img->data[pixel + 1]) < 12 && abs(img->data[pixel + 1] - img->data[pixel + 2]) < 12 && abs(img->data[pixel] - img->data[pixel + 2]) < 12){
-            unsigned char gray_index = convert_grayscale_8bit((unsigned char) ((int) img->data[pixel] + (int) img->data[pixel + 1] + (int) img->data[pixel + 2]) / 3);
-            unsigned char color_index = convert_color_8bit(&img->data[pixel]);
-            unsigned char val_color[3], val_gray[3] = {8 + 10 * (gray_index - 232)};
-            val_color[0] = (color_index - 16) / 36;
-            val_color[1] = ((color_index - 16) / 6) % 6;
-            val_color[2] = (color_index - 16) % 6;
-            float dist_gray = euclidean_3D(&img->data[pixel], val_gray);
-            float dist_color = euclidean_3D(&img->data[pixel], val_color);
-            if (dist_gray < dist_color){
-                img->data[index++] = gray_index;
-            }
-            else{
-                img->data[index++] = color_index;
-            }
-        }
-        else{
-            img->data[index++] = convert_color_8bit(&img->data[pixel]);
-        }
-    }
 }
 
 void image_scale(ImageInfo *img, int scalefactor, int progress){
