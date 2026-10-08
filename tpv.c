@@ -2,6 +2,7 @@
 #include <math.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include <termios.h>
 #include <unistd.h>
 #include <sys/ioctl.h>
@@ -33,6 +34,7 @@ unsigned char convert_grayscale_8bit(unsigned char value);
 unsigned char get_ansi_level(unsigned char);
 float get_euclidean_distance_3D(unsigned char *p1, unsigned char *p2);
 void get_term_bg(unsigned char *bg_col);
+int get_term_colordepth();
 struct winsize get_term_size();
 error_t parse_opt(int key, char *arg, struct argp_state *state);
 void print_clear();
@@ -40,6 +42,7 @@ void print_picture_8bit(ImageInfo *img, const struct winsize *term, int fast);
 void print_picture_24bit(ImageInfo *img, const struct winsize *term, int fast);
 void print_pixel_8bit(unsigned char top, unsigned char bot);
 void print_pixel_24bit(unsigned char *top, unsigned char *bot, int ch_single);
+void set_term_mode_raw(struct termios *term_current);
 
 char doc[] = "CLI tool to print images in terminal";
 char args_doc[] = "filepath";
@@ -60,7 +63,7 @@ int main(int argc, char **argv){
     arguments.fast = 0;
     arguments.no_scaling = 0;
     arguments.no_vert_scaling = 0;
-    arguments.color_depth = 24;
+    arguments.color_depth = 0;
     arguments.arg_inline = 0;
     arguments.progress = 0;
     arguments.filepath = "";
@@ -69,6 +72,14 @@ int main(int argc, char **argv){
     ImageInfo img;
     img.data = stbi_load(arguments.filepath, &img.w, &img.h, &img.c, 0);
     const struct winsize term = get_term_size();
+    int colordepth = get_term_colordepth();
+    if (arguments.color_depth == 0){
+        arguments.color_depth = colordepth;
+    }
+    else if (arguments.color_depth > colordepth){
+        printf("Requested color depth is higher than maximum supported by terminal\n");
+        goto cleanup;
+    }
     unsigned char termbg[3] = {0};
     get_term_bg(termbg);
 
@@ -122,7 +133,7 @@ int main(int argc, char **argv){
         print_picture_24bit(&img, &term, arguments.fast);
     }
 
-    //cleanup
+    cleanup:
     free(img.data);
     return 0;
 }
@@ -252,18 +263,13 @@ float get_euclidean_distance_3D(unsigned char *p1, unsigned char *p2){
 }
 
 void get_term_bg(unsigned char *bg_col){
-    struct termios old_term, raw_term;
-    tcgetattr(STDIN_FILENO, &old_term);
-    raw_term = old_term;
-    raw_term.c_lflag &= ~(ICANON | ECHO);
-    raw_term.c_cc[VMIN] = 0;
-    raw_term.c_cc[VTIME] = 5;
-    tcsetattr(STDIN_FILENO, TCSANOW, &raw_term);
+    struct termios term_old;
+    set_term_mode_raw(&term_old);
     printf("\033]11;?\007");
     fflush(stdout);
     char buf[64] = {0};
     int n = read(STDIN_FILENO, buf, sizeof(buf) - 1);
-    tcsetattr(STDIN_FILENO, TCSANOW, &old_term);
+    tcsetattr(STDIN_FILENO, TCSANOW, &term_old);
     if (n > 0){
         unsigned int r, g, b;
         sscanf(buf, "\033]11;rgb:%x/%x/%x", &r, &g, &b);
@@ -276,6 +282,71 @@ void get_term_bg(unsigned char *bg_col){
         bg_col = NULL;
         return;
     }
+}
+
+int get_term_colordepth(){
+    struct termios term_old;
+    char buf[64] = {0};
+    int n, depth = 1;
+    set_term_mode_raw(&term_old);
+    printf("\033[38;2;1;2;3m");
+    printf("\033P$qm\033\\");
+    printf("\033[c");
+    fflush(stdout);
+    n = read(STDIN_FILENO, buf, sizeof(buf) - 1);
+    if (n > 0 && buf[1] == 'P' && buf[2] == '1' && buf[5] != '0'){
+        depth = 24;
+    }
+    else{
+        printf("\033P+q524742\033\\");
+        printf("\033[c");
+        fflush(stdout);
+        n = read(STDIN_FILENO, buf, sizeof(buf) - 1);
+        if (buf[1] == 'P'){
+            depth = 24;
+        }
+        else{
+            const char *env_colorterm = getenv("COLORTERM");
+            const char *env_term = getenv("TERM");
+            if ((env_colorterm && (strcmp(env_colorterm, "truecolor") == 0 || strcmp(env_colorterm, "24bit") == 0)) || (env_term && (strcmp(env_term, "st-256color") == 0))){
+                depth = 24;
+            }
+            else if (env_term && strcmp(env_term, "linux")){
+                depth = 3;
+            }
+            else {
+                printf("\033]4;255;?\033\\");
+                printf("\033[c");
+                fflush(stdout);
+                n = read(STDIN_FILENO, buf, sizeof(buf) - 1);
+                if (buf[1] == ']'){
+                    depth = 8;
+                }
+                else{
+                    printf("\033]4;15;?\033\\");
+                    printf("\033[c");
+                    fflush(stdout);
+                    n = read(STDIN_FILENO, buf, sizeof(buf) - 1);
+                    if (buf[1] == ']'){
+                        depth = 4;
+                    }
+                    else{
+                        printf("\033]4;7;?\033\\");
+                        printf("\033[c");
+                        fflush(stdout);
+                        n = read(STDIN_FILENO, buf, sizeof(buf) - 1);
+                        if (buf[1] == ']'){
+                            depth = 3;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    fflush(stdin);
+    tcsetattr(STDIN_FILENO, TCSANOW, &term_old);
+    printf("\033[0m");
+    return depth;
 }
 
 struct winsize get_term_size(){
@@ -413,4 +484,14 @@ void print_pixel_24bit(unsigned char *top, unsigned char *bot, int ch_single){
         printf("%c[38;2;%d;%d;%dm", 0x1B, *top, *(top + 1), *(top + 2));
         printf("%c[48;2;%d;%d;%dm\u2580", 0x1B, *bot, *(bot + 1), *(bot + 2));
     }   
+}
+
+void set_term_mode_raw(struct termios *term_current){
+    struct termios term_raw;
+    tcgetattr(STDIN_FILENO, term_current);
+    term_raw = *term_current;
+    term_raw.c_lflag &= ~(ICANON | ECHO);
+    term_raw.c_cc[VMIN] = 0;
+    term_raw.c_cc[VTIME] = 5;
+    tcsetattr(STDIN_FILENO, TCSANOW, &term_raw);
 }
