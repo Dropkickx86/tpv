@@ -25,22 +25,21 @@ typedef struct {
     unsigned char *data;
 } ImageInfo;
 
-unsigned char alpha_apply(unsigned char color, unsigned char bg, unsigned char a);
+unsigned char apply_image_alpha(unsigned char color, unsigned char bg, unsigned char a);
+void apply_image_scale(ImageInfo *img, int scalefactor, int progress);
 unsigned char convert_8bit(unsigned char r, unsigned char g, unsigned char b);
 unsigned char convert_color_8bit(unsigned char r, unsigned char g, unsigned char b);
 unsigned char convert_grayscale_8bit(unsigned char value);
-void endprint();
-float euclidean_3D(unsigned char *p1, unsigned char *p2);
 unsigned char get_ansi_level(unsigned char);
-void gettermbg(unsigned char *bg_col);
-struct winsize getterminfo();
-void image_scale(ImageInfo *img, int scalefactor, int progress);
+float get_euclidean_distance_3D(unsigned char *p1, unsigned char *p2);
+void get_term_bg(unsigned char *bg_col);
+struct winsize get_term_size();
 error_t parse_opt(int key, char *arg, struct argp_state *state);
-void picture_print_8bit(ImageInfo *img, const struct winsize *term, int fast);
-void picture_print_24bit(ImageInfo *img, const struct winsize *term, int fast);
-void pixel_print_8bit(unsigned char top, unsigned char bot);
-void pixel_print_24bit(unsigned char *top, unsigned char *bot, int ch_single);
-int scrclear();
+void print_clear();
+void print_picture_8bit(ImageInfo *img, const struct winsize *term, int fast);
+void print_picture_24bit(ImageInfo *img, const struct winsize *term, int fast);
+void print_pixel_8bit(unsigned char top, unsigned char bot);
+void print_pixel_24bit(unsigned char *top, unsigned char *bot, int ch_single);
 
 char doc[] = "CLI tool to print images in terminal";
 char args_doc[] = "filepath";
@@ -69,9 +68,9 @@ int main(int argc, char **argv){
 
     ImageInfo img;
     img.data = stbi_load(arguments.filepath, &img.w, &img.h, &img.c, 0);
-    const struct winsize term = getterminfo();
+    const struct winsize term = get_term_size();
     unsigned char termbg[3] = {0};
-    gettermbg(termbg);
+    get_term_bg(termbg);
 
     //scaling
     if (!arguments.no_scaling && !arguments.fast){
@@ -83,7 +82,7 @@ int main(int argc, char **argv){
             scalefactor = (img.w / term.ws_col) + 1;
         }
         if (scalefactor > 1){
-            image_scale(&img, scalefactor, arguments.progress);
+            apply_image_scale(&img, scalefactor, arguments.progress);
         }
     }
 
@@ -91,14 +90,14 @@ int main(int argc, char **argv){
     if (img.c == 2 || img.c == 4){
         for (int pixel = 0; pixel < (img.h * img.w * img.c); pixel += img.c){
             for (int offset = 0; offset < img.c - 1; offset++){
-                img.data[pixel + offset] = alpha_apply(img.data[pixel + offset], termbg[offset], img.data[pixel + img.c - 1]);
+                img.data[pixel + offset] = apply_image_alpha(img.data[pixel + offset], termbg[offset], img.data[pixel + img.c - 1]);
             }
         }
     }
 
     //render
     if (!arguments.arg_inline){
-        scrclear();
+        print_clear();
     }
     if (img.h % 2 != 0){
         unsigned char *temp = realloc(img.data, sizeof(unsigned char) * ((img.w * img.h * img.c) + (img.w * img.c)));
@@ -117,10 +116,10 @@ int main(int argc, char **argv){
         }
     }
     if (arguments.color_depth == 8){
-        picture_print_8bit(&img, &term, arguments.fast);
+        print_picture_8bit(&img, &term, arguments.fast);
     }
     else if (arguments.color_depth == 24){
-        picture_print_24bit(&img, &term, arguments.fast);
+        print_picture_24bit(&img, &term, arguments.fast);
     }
 
     //cleanup
@@ -128,7 +127,7 @@ int main(int argc, char **argv){
     return 0;
 }
 
-unsigned char alpha_apply(unsigned char color, unsigned char bg, unsigned char a){
+unsigned char apply_image_alpha(unsigned char color, unsigned char bg, unsigned char a){
     if (a != 255){
         float alpha = (float)a / 255;
         color = (color * alpha) + (bg * (1.0 - alpha));
@@ -136,116 +135,7 @@ unsigned char alpha_apply(unsigned char color, unsigned char bg, unsigned char a
     return color;
 }
 
-unsigned char convert_8bit(unsigned char r, unsigned char g, unsigned char b){
-    if (abs(r - g) < 12 && abs(g - b) < 12 && abs(r - b) < 12){
-        unsigned char gray_index = convert_grayscale_8bit((unsigned char) (((int) r + (int) g + (int) b) / 3));
-        unsigned char color_index = convert_color_8bit(r, g, b);
-        unsigned char val_color[3], val_gray[3] = {8 + 10 * (gray_index - 232), 8 + 10 * (gray_index - 232), 8 + 10 * (gray_index - 232)};
-        if (color_index == 16){
-            val_color[0] = 0;
-            val_color[1] = 0;
-            val_color[2] = 0;
-        }
-        else{
-            val_color[0] = 55 + (40 * ((color_index - 16) / 36));
-            val_color[1] = 55 + (40 * (((color_index - 16) / 6) % 6));
-            val_color[2] = 55 + (40 * ((color_index - 16) % 6));
-        }
-        unsigned char temp_color[3] = {r, g, b};
-        float dist_gray = euclidean_3D(temp_color, val_gray);
-        float dist_color = euclidean_3D(temp_color, val_color);
-        if (dist_gray < dist_color){
-            return gray_index;
-        }
-        else{
-            return color_index;
-        }
-    }
-    else{
-        return convert_color_8bit(r, g, b);
-    }
-}
-
-unsigned char convert_color_8bit(unsigned char r, unsigned char g, unsigned char b){
-    return (unsigned char) 16 + (36 * get_ansi_level(r)) + (6 * get_ansi_level(g)) + get_ansi_level(b);
-}
-
-unsigned char convert_grayscale_8bit(unsigned char value){
-    if (value < 8){
-        return 16;
-    }
-    else if (value > 248){
-        return 231;
-    }
-    else{
-        return roundf(((float)value - 8) / 247 * 23) + 232;
-    }
-}
-
-void endprint(){
-    printf("%c[0m", 0x1B);
-}
-
-float euclidean_3D(unsigned char *p1, unsigned char *p2){
-    int dist_r = (p1[0] - p2[0]) * (p1[0] - p2[0]);
-    int dist_g = (p1[0] - p2[0]) * (p1[0] - p2[0]);
-    int dist_b = (p1[0] - p2[0]) * (p1[0] - p2[0]);
-    int dist_tot = dist_r + dist_g + dist_b;
-    return sqrtf((float) dist_tot);
-}
-
-unsigned char get_ansi_level(unsigned char value){
-    const unsigned char levels[6] = {0, 95, 135, 175, 215, 255};
-    unsigned char level = 0;
-    unsigned char nearest = 255;
-    for (unsigned char i = 0; i < 6; i++){
-        int diff = abs(value - levels[i]);
-        if (diff == 0){
-            return i;
-        }
-        else if (diff < nearest){
-            level = i;
-            nearest = diff;
-        }
-    }
-    return level;
-}
-
-void gettermbg(unsigned char *bg_col){
-    struct termios old_term, raw_term;
-    tcgetattr(STDIN_FILENO, &old_term);
-    raw_term = old_term;
-    raw_term.c_lflag &= ~(ICANON | ECHO);
-    raw_term.c_cc[VMIN] = 0;
-    raw_term.c_cc[VTIME] = 5;
-    tcsetattr(STDIN_FILENO, TCSANOW, &raw_term);
-    printf("\033]11;?\007");
-    fflush(stdout);
-    char buf[64] = {0};
-    int n = read(STDIN_FILENO, buf, sizeof(buf) - 1);
-    tcsetattr(STDIN_FILENO, TCSANOW, &old_term);
-    if (n > 0){
-        unsigned int r, g, b;
-        sscanf(buf, "\033]11;rgb:%x/%x/%x", &r, &g, &b);
-        bg_col[0] = (unsigned char)(r >> 8);
-        bg_col[1] = (unsigned char)(g >> 8);
-        bg_col[2] = (unsigned char)(b >> 8);
-        return;
-    }
-    else {
-        bg_col = NULL;
-        return;
-    }
-}
-
-struct winsize getterminfo(){
-    struct winsize term;
-    ioctl(STDOUT_FILENO, TIOCGWINSZ, &term);
-    term.ws_row -= 1;
-    return term;
-}
-
-void image_scale(ImageInfo *img, int scalefactor, int progress){
+void apply_image_scale(ImageInfo *img, int scalefactor, int progress){
     int finalIndex, cursor = 5;
     if (progress){
         float h = ceil((float)img->h / (float)scalefactor);
@@ -288,6 +178,111 @@ void image_scale(ImageInfo *img, int scalefactor, int progress){
     if (progress){
         printf("\n");
     }
+}
+
+unsigned char convert_8bit(unsigned char r, unsigned char g, unsigned char b){
+    if (abs(r - g) < 12 && abs(g - b) < 12 && abs(r - b) < 12){
+        unsigned char gray_index = convert_grayscale_8bit((unsigned char) (((int) r + (int) g + (int) b) / 3));
+        unsigned char color_index = convert_color_8bit(r, g, b);
+        unsigned char val_color[3], val_gray[3] = {8 + 10 * (gray_index - 232), 8 + 10 * (gray_index - 232), 8 + 10 * (gray_index - 232)};
+        if (color_index == 16){
+            val_color[0] = 0;
+            val_color[1] = 0;
+            val_color[2] = 0;
+        }
+        else{
+            val_color[0] = 55 + (40 * ((color_index - 16) / 36));
+            val_color[1] = 55 + (40 * (((color_index - 16) / 6) % 6));
+            val_color[2] = 55 + (40 * ((color_index - 16) % 6));
+        }
+        unsigned char temp_color[3] = {r, g, b};
+        float dist_gray = get_euclidean_distance_3D(temp_color, val_gray);
+        float dist_color = get_euclidean_distance_3D(temp_color, val_color);
+        if (dist_gray < dist_color){
+            return gray_index;
+        }
+        else{
+            return color_index;
+        }
+    }
+    else{
+        return convert_color_8bit(r, g, b);
+    }
+}
+
+unsigned char convert_color_8bit(unsigned char r, unsigned char g, unsigned char b){
+    return (unsigned char) 16 + (36 * get_ansi_level(r)) + (6 * get_ansi_level(g)) + get_ansi_level(b);
+}
+
+unsigned char convert_grayscale_8bit(unsigned char value){
+    if (value < 8){
+        return 16;
+    }
+    else if (value > 248){
+        return 231;
+    }
+    else{
+        return roundf(((float)value - 8) / 247 * 23) + 232;
+    }
+}
+
+unsigned char get_ansi_level(unsigned char value){
+    const unsigned char levels[6] = {0, 95, 135, 175, 215, 255};
+    unsigned char level = 0;
+    unsigned char nearest = 255;
+    for (unsigned char i = 0; i < 6; i++){
+        int diff = abs(value - levels[i]);
+        if (diff == 0){
+            return i;
+        }
+        else if (diff < nearest){
+            level = i;
+            nearest = diff;
+        }
+    }
+    return level;
+}
+
+float get_euclidean_distance_3D(unsigned char *p1, unsigned char *p2){
+    int dist_r = (p1[0] - p2[0]) * (p1[0] - p2[0]);
+    int dist_g = (p1[0] - p2[0]) * (p1[0] - p2[0]);
+    int dist_b = (p1[0] - p2[0]) * (p1[0] - p2[0]);
+    int dist_tot = dist_r + dist_g + dist_b;
+    return sqrtf((float) dist_tot);
+}
+
+void get_term_bg(unsigned char *bg_col){
+    struct termios old_term, raw_term;
+    tcgetattr(STDIN_FILENO, &old_term);
+    raw_term = old_term;
+    raw_term.c_lflag &= ~(ICANON | ECHO);
+    raw_term.c_cc[VMIN] = 0;
+    raw_term.c_cc[VTIME] = 5;
+    tcsetattr(STDIN_FILENO, TCSANOW, &raw_term);
+    printf("\033]11;?\007");
+    fflush(stdout);
+    char buf[64] = {0};
+    int n = read(STDIN_FILENO, buf, sizeof(buf) - 1);
+    tcsetattr(STDIN_FILENO, TCSANOW, &old_term);
+    if (n > 0){
+        unsigned int r, g, b;
+        sscanf(buf, "\033]11;rgb:%x/%x/%x", &r, &g, &b);
+        bg_col[0] = (unsigned char)(r >> 8);
+        bg_col[1] = (unsigned char)(g >> 8);
+        bg_col[2] = (unsigned char)(b >> 8);
+        return;
+    }
+    else {
+        bg_col = NULL;
+        return;
+    }
+}
+
+struct winsize get_term_size(){
+    struct winsize term;
+    ioctl(STDOUT_FILENO, TIOCGWINSZ, &term);
+    term.ws_row -= 1;
+    return term;
 }
 
 error_t parse_opt(int key, char *arg, struct argp_state *state){
@@ -334,7 +329,12 @@ error_t parse_opt(int key, char *arg, struct argp_state *state){
     return 0;
 }
 
-void picture_print_8bit(ImageInfo *img, const struct winsize *term, int fast){
+void print_clear(){
+    printf("%c[2J", 0x1B);
+    printf("%c[H", 0x1B);
+}
+
+void print_picture_8bit(ImageInfo *img, const struct winsize *term, int fast){
     int offset = 1;
     if (fast){
         if (img->w / term->ws_col > img->h / (term->ws_row * 2)){
@@ -362,15 +362,15 @@ void picture_print_8bit(ImageInfo *img, const struct winsize *term, int fast){
                 color_top = convert_8bit(img->data[(row * img->w * img->c) + (col * img->c)], img->data[(row * img->w * img->c) + (col * img->c) + 1], img->data[(row * img->w * img->c) + (col * img->c) + 2]);
                 color_bot = convert_8bit(img->data[((row + offset) * img->w * img->c) + (col * img->c)], img->data[((row + offset) * img->w * img->c) + (col * img->c) + 1], img->data[((row + offset) * img->w * img->c) + (col * img->c) + 2]);
             }
-            pixel_print_8bit(color_top, color_bot);
+            print_pixel_8bit(color_top, color_bot);
             col_out++;
         }
         printf("%c[0m\n", 0x1B);
     }
-    endprint();
+    printf("%c[0m", 0x1B);
 }
 
-void picture_print_24bit(ImageInfo *img, const struct winsize *term, int fast){
+void print_picture_24bit(ImageInfo *img, const struct winsize *term, int fast){
     int offset = 1;
     int ch_single = 0;
     if (img->c < 3){
@@ -391,20 +391,20 @@ void picture_print_24bit(ImageInfo *img, const struct winsize *term, int fast){
             if (col_out >= term->ws_col) {
                 break;
             }
-            pixel_print_24bit(img->data + (row * img->w * img->c) + (col * img->c), img->data + ((row + offset) * img->w * img->c) + (col * img->c), ch_single);
+            print_pixel_24bit(img->data + (row * img->w * img->c) + (col * img->c), img->data + ((row + offset) * img->w * img->c) + (col * img->c), ch_single);
             col_out++;
         }
         printf("%c[0m\n", 0x1B);
     }
-    endprint();
+    printf("%c[0m", 0x1B);
 }
 
-void pixel_print_8bit(unsigned char top, unsigned char bot){
+void print_pixel_8bit(unsigned char top, unsigned char bot){
     printf("%c[38;5;%dm", 0x1B, top);
     printf("%c[48;5;%dm\u2580", 0x1B, bot);
 }
 
-void pixel_print_24bit(unsigned char *top, unsigned char *bot, int ch_single){
+void print_pixel_24bit(unsigned char *top, unsigned char *bot, int ch_single){
     if (ch_single){
         printf("%c[38;2;%d;%d;%dm", 0x1B, *top, *top, *top);
         printf("%c[48;2;%d;%d;%dm\u2580", 0x1B, *bot, *bot, *bot);
@@ -413,10 +413,4 @@ void pixel_print_24bit(unsigned char *top, unsigned char *bot, int ch_single){
         printf("%c[38;2;%d;%d;%dm", 0x1B, *top, *(top + 1), *(top + 2));
         printf("%c[48;2;%d;%d;%dm\u2580", 0x1B, *bot, *(bot + 1), *(bot + 2));
     }   
-}
-
-int scrclear(){
-    printf("%c[2J", 0x1B);
-    printf("%c[H", 0x1B);
-    return 0;
 }
