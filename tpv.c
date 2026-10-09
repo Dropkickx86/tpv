@@ -36,6 +36,7 @@ float get_euclidean_distance_3D(unsigned char *p1, unsigned char *p2);
 void get_term_bg(unsigned char *bg_col);
 int get_term_colordepth();
 struct winsize get_term_size();
+void next_entry(char *buffer);
 error_t parse_opt(int key, char *arg, struct argp_state *state);
 void print_clear();
 void print_picture_8bit(ImageInfo *img, const struct winsize *term, int fast);
@@ -286,67 +287,52 @@ void get_term_bg(unsigned char *bg_col){
 
 int get_term_colordepth(){
     struct termios term_old;
-    char buf[64] = {0};
-    int n, depth = 1;
+    char buffer[128] = {0};
+    const char *env_colorterm = getenv("COLORTERM");
+    const char *env_term = getenv("TERM");
+    int inamount = 0;
     set_term_mode_raw(&term_old);
     printf("\033[38;2;1;2;3m");
     printf("\033P$qm\033\\");
+    printf("\033P+q524742\033\\");
+    printf("\033]4;255;?\033\\");
+    printf("\033]4;15;?\033\\");
+    printf("\033]4;7;?\033\\");
     printf("\033[c");
+    printf("\033[0m");
     fflush(stdout);
-    n = read(STDIN_FILENO, buf, sizeof(buf) - 1);
-    if (n > 0 && buf[1] == 'P' && buf[2] == '1' && buf[5] != '0'){
-        depth = 24;
-    }
-    else{
-        printf("\033P+q524742\033\\");
-        printf("\033[c");
-        fflush(stdout);
-        n = read(STDIN_FILENO, buf, sizeof(buf) - 1);
-        if (buf[1] == 'P'){
-            depth = 24;
-        }
-        else{
-            const char *env_colorterm = getenv("COLORTERM");
-            const char *env_term = getenv("TERM");
-            if ((env_colorterm && (strcmp(env_colorterm, "truecolor") == 0 || strcmp(env_colorterm, "24bit") == 0)) || (env_term && (strcmp(env_term, "st-256color") == 0))){
-                depth = 24;
-            }
-            else if (env_term && strcmp(env_term, "linux")){
-                depth = 3;
-            }
-            else {
-                printf("\033]4;255;?\033\\");
-                printf("\033[c");
-                fflush(stdout);
-                n = read(STDIN_FILENO, buf, sizeof(buf) - 1);
-                if (buf[1] == ']'){
-                    depth = 8;
-                }
-                else{
-                    printf("\033]4;15;?\033\\");
-                    printf("\033[c");
-                    fflush(stdout);
-                    n = read(STDIN_FILENO, buf, sizeof(buf) - 1);
-                    if (buf[1] == ']'){
-                        depth = 4;
-                    }
-                    else{
-                        printf("\033]4;7;?\033\\");
-                        printf("\033[c");
-                        fflush(stdout);
-                        n = read(STDIN_FILENO, buf, sizeof(buf) - 1);
-                        if (buf[1] == ']'){
-                            depth = 3;
-                        }
-                    }
-                }
-            }
-        }
-    }
+    do {
+        inamount += read(STDIN_FILENO, buffer + inamount, sizeof(buffer) - 1);
+    } while (buffer[inamount - 1] != 'c');
+
     fflush(stdin);
     tcsetattr(STDIN_FILENO, TCSANOW, &term_old);
-    printf("\033[0m");
-    return depth;
+    while (buffer[1] == 'P'){ 
+        if (buffer[2] == '1' && buffer[5] != '0'){
+            return 24;
+        }
+        else {
+            next_entry(buffer);
+        }
+    }
+    if ((env_colorterm && (strcmp(env_colorterm, "truecolor") == 0 || strcmp(env_colorterm, "24bit") == 0)) || (env_term && (strcmp(env_term, "st-256color") == 0))){
+        return 24;
+    }
+    if (buffer[1] == ']'){
+        if (buffer[4] == '2'){
+            return 8;
+        }
+        else if (buffer[4] == '1') {
+            return 4;
+        }
+        else if (buffer[4] == '7') {
+            return 3;
+        }
+    }
+    if (env_term && strcmp(env_term, "linux")){
+        return 3;
+    }
+    return 1;
 }
 
 struct winsize get_term_size(){
@@ -354,6 +340,23 @@ struct winsize get_term_size(){
     ioctl(STDOUT_FILENO, TIOCGWINSZ, &term);
     term.ws_row -= 1;
     return term;
+}
+
+void next_entry(char *buffer){
+    int index = 0, nextindex = 0;
+    for (int i = 0; buffer[i] != '\0'; i++){
+        if (buffer[i] == '\\' && buffer[i + 1] == '\033'){
+            nextindex = i;
+            break;
+        }
+    }
+    if (index == nextindex){
+        buffer[0] = '\0';
+        return;
+    }
+    do {
+        buffer[index++] = buffer[++nextindex];
+    } while(buffer[nextindex] != '\0');
 }
 
 error_t parse_opt(int key, char *arg, struct argp_state *state){
