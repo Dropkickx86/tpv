@@ -49,6 +49,7 @@ void print_clear();
 void print_picture(ImageInfo *img, const struct winsize *term, int fast, int colordepth);
 void print_pixel_8bit(unsigned char top, unsigned char bot);
 void print_pixel_24bit(unsigned char *top, unsigned char *bot, int ch_single);
+void print_pixel_bw(unsigned char top, unsigned char bot);
 void print_pixel_systemcolor(unsigned char top, unsigned char bot);
 void set_term_mode_raw(struct termios *term_current);
 
@@ -663,13 +664,30 @@ void print_picture(ImageInfo *img, const struct winsize *term, int fast, int col
                     extended = 1;
                 }
                 if (img->c < 3){
-                    //Need code for grayscale
+                    color_top = img->data[(row * img->w * img->c) + (col * img->c)];
+                    color_bot = img->data[((row + offset) * img->w * img->c) + (col * img->c)];
+                    color_top = convert_bw(color_top, color_top, color_top);
+                    color_bot = convert_bw(color_bot, color_bot, color_bot);
+                    print_pixel_bw(color_top, color_bot);
                 }
                 else{
                     color_top = convert_systemcolor(img->data[(row * img->w * img->c) + (col * img->c)], img->data[(row * img->w * img->c) + (col * img->c) + 1], img->data[(row * img->w * img->c) + (col * img->c) + 2], extended);
                     color_bot = convert_systemcolor(img->data[((row + offset) * img->w * img->c) + (col * img->c)], img->data[((row + offset) * img->w * img->c) + (col * img->c) + 1], img->data[((row + offset) * img->w * img->c) + (col * img->c) + 2], extended);
+                    print_pixel_systemcolor(color_top, color_bot);
                 }
-                print_pixel_systemcolor(color_top, color_bot);
+            }
+            else if (colordepth == 1){
+                if (img->c < 3){
+                    color_top = img->data[(row * img->w * img->c) + (col * img->c)];
+                    color_bot = img->data[((row + offset) * img->w * img->c) + (col * img->c)];
+                    color_top = convert_bw(color_top, color_top, color_top);
+                    color_bot = convert_bw(color_bot, color_bot, color_bot);
+                }
+                else{
+                    color_top = convert_bw(img->data[(row * img->w * img->c) + (col * img->c)], img->data[(row * img->w * img->c) + (col * img->c) + 1], img->data[(row * img->w * img->c) + (col * img->c) + 2]);
+                    color_bot = convert_bw(img->data[((row + offset) * img->w * img->c) + (col * img->c)], img->data[((row + offset) * img->w * img->c) + (col * img->c) + 1], img->data[((row + offset) * img->w * img->c) + (col * img->c) + 2]);
+                }
+                print_pixel_bw(color_top, color_bot);
             }
             
             col_out++;
@@ -693,6 +711,21 @@ void print_pixel_24bit(unsigned char *top, unsigned char *bot, int ch_single){
         printf("%c[38;2;%d;%d;%dm", 0x1B, *top, *(top + 1), *(top + 2));
         printf("%c[48;2;%d;%d;%dm\u2580", 0x1B, *bot, *(bot + 1), *(bot + 2));
     }   
+}
+
+void print_pixel_bw(unsigned char top, unsigned char bot){
+    if (top + bot == 2){
+        printf("\033[7m \033[27m");
+    }
+    else if (top + bot == 0){
+        printf(" ");
+    }
+    else if (top == 1){
+        printf("\u2580");
+    }
+    else if (bot == 1){
+        printf("\033[7m\u2580\033[27m");
+    }
 }
 
 void print_pixel_systemcolor(unsigned char top, unsigned char bot){
