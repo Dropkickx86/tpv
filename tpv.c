@@ -28,6 +28,8 @@ typedef struct {
 
 unsigned char apply_image_alpha(unsigned char color, unsigned char bg, unsigned char a);
 void apply_image_scale(ImageInfo *img, int scalefactor, int progress);
+unsigned char convert_bw(unsigned char r, unsigned char g, unsigned char b);
+unsigned char convert_systemcolor(unsigned char r, unsigned char g, unsigned char b, int extended);
 unsigned char convert_88(unsigned char r, unsigned char g, unsigned char b);
 unsigned char convert_color_88(unsigned char r, unsigned char g, unsigned char b);
 unsigned char convert_grayscale_88(unsigned char value);
@@ -39,6 +41,7 @@ unsigned char get_ansi_level_256(unsigned char);
 float get_euclidean_distance_3D(unsigned char *p1, unsigned char *p2);
 void get_term_bg(unsigned char *bg_col);
 int get_term_colordepth();
+void get_term_colorpalette();
 struct winsize get_term_size();
 void next_entry(char *buffer);
 error_t parse_opt(int key, char *arg, struct argp_state *state);
@@ -46,6 +49,7 @@ void print_clear();
 void print_picture(ImageInfo *img, const struct winsize *term, int fast, int colordepth);
 void print_pixel_8bit(unsigned char top, unsigned char bot);
 void print_pixel_24bit(unsigned char *top, unsigned char *bot, int ch_single);
+void print_pixel_systemcolor(unsigned char top, unsigned char bot);
 void set_term_mode_raw(struct termios *term_current);
 
 char doc[] = "CLI tool to print images in terminal";
@@ -61,8 +65,28 @@ struct argp_option options[] = {
     {0},
 };
 struct argp argp = {options, parse_opt, args_doc, doc, 0, 0, 0};
+unsigned char palette[16][3] = {
+    {0, 0, 0},
+    {170, 0, 0},
+    {0, 170, 0},
+    {170, 85, 0},
+    {0, 0, 170},
+    {170, 0, 170},
+    {0, 170, 170},
+    {170, 170, 170},
+    {85, 85, 85},
+    {255, 85, 85},
+    {85, 255, 85},
+    {255, 255, 85},
+    {85, 85, 255},
+    {255, 85, 255},
+    {85, 255, 255},
+    {255, 255, 255}
+};
 
 int main(int argc, char **argv){
+    convert_systemcolor(0, 0, 0, 0);
+    
     struct arguments arguments;
     arguments.fast = 0;
     arguments.no_scaling = 0;
@@ -83,6 +107,9 @@ int main(int argc, char **argv){
     else if (arguments.color_depth > colordepth){
         printf("Requested color depth is higher than maximum supported by terminal\n");
         goto cleanup;
+    }
+    if (arguments.color_depth <= 4){
+        get_term_colorpalette();
     }
     unsigned char termbg[3] = {0};
     get_term_bg(termbg);
@@ -188,6 +215,33 @@ void apply_image_scale(ImageInfo *img, int scalefactor, int progress){
     if (progress){
         printf("\n");
     }
+}
+
+unsigned char convert_bw(unsigned char r, unsigned char g, unsigned char b){
+    unsigned char value = (r + g + b) / 3;
+    if (value > 127){
+        return 1;
+    }
+    else{
+        return 0;
+    }
+}
+
+unsigned char convert_systemcolor(unsigned char r, unsigned char g, unsigned char b, int extended){
+    unsigned char color[3] = {r, g, b};
+    float closestvalue = 442.0;
+    int closestindex = 0;
+    for (int i = 0; i < 7 + (8 * extended); i++){
+        float value = get_euclidean_distance_3D(color, palette[i]);
+        if (value == 0){
+            return (unsigned char) i;
+        }
+        else if (value < closestvalue){
+            closestvalue = value;
+            closestindex = i;
+        }
+    }
+    return (unsigned char) closestindex;
 }
 
 unsigned char convert_88(unsigned char r, unsigned char g, unsigned char b){
@@ -361,7 +415,7 @@ void get_term_bg(unsigned char *bg_col){
 
 int get_term_colordepth(){
     struct termios term_old;
-    char buffer[128] = {0};
+    char buffer[256] = {0};
     const char *env_colorterm = getenv("COLORTERM");
     const char *env_term = getenv("TERM");
     int inamount = 0;
@@ -407,10 +461,61 @@ int get_term_colordepth(){
             return 3;
         }
     }
-    if (env_term && strcmp(env_term, "linux")){
+    if (env_term && strcmp(env_term, "linux") == 0){
         return 3;
     }
     return 1;
+}
+
+void get_term_colorpalette(){
+    struct termios term_old;
+    char buffer[430] = {0};
+    int inamount = 0;
+    set_term_mode_raw(&term_old);
+    printf("\033]4;0;?\033\\");
+    printf("\033]4;1;?\033\\");
+    printf("\033]4;2;?\033\\");
+    printf("\033]4;3;?\033\\");
+    printf("\033]4;4;?\033\\");
+    printf("\033]4;5;?\033\\");
+    printf("\033]4;6;?\033\\");
+    printf("\033]4;7;?\033\\");
+    printf("\033]4;8;?\033\\");
+    printf("\033]4;9;?\033\\");
+    printf("\033]4;10;?\033\\");
+    printf("\033]4;11;?\033\\");
+    printf("\033]4;12;?\033\\");
+    printf("\033]4;13;?\033\\");
+    printf("\033]4;14;?\033\\");
+    printf("\033]4;15;?\033\\");
+    printf("\033[c");
+    printf("\033[0m");
+    fflush(stdout);
+    do {
+        inamount += read(STDIN_FILENO, buffer + inamount, sizeof(buffer) - 1);
+    } while (buffer[inamount - 1] != 'c');
+    fflush(stdin);
+    tcsetattr(STDIN_FILENO, TCSANOW, &term_old);
+    while (buffer[1] == ']' && buffer[0] != '\0'){
+        int i, offset = 10;
+        if (buffer[5] == ';'){
+            i = (int)buffer[4] - 48;
+        }
+        else{
+            i = (int)buffer[5] -38;
+            offset++;
+        }
+        char temp[3];
+        strncpy(temp, buffer + offset, 2);
+        palette[i][0] = (unsigned char)strtol(temp, NULL, 16);
+        offset += 5;
+        strncpy(temp, buffer + offset, 2);
+        palette[i][1] = (unsigned char)strtol(temp, NULL, 16);
+        offset += 5;
+        strncpy(temp, buffer + offset, 2);
+        palette[i][2] = (unsigned char)strtol(temp, NULL, 16);
+        next_entry(buffer);
+    }
 }
 
 struct winsize get_term_size(){
@@ -426,6 +531,9 @@ void next_entry(char *buffer){
         if (buffer[i] == '\\' && buffer[i + 1] == '\033'){
             nextindex = i;
             break;
+        }
+        else if (buffer[i] == '\007' && buffer[i + 1] == '\033'){
+            nextindex = i;
         }
     }
     if (index == nextindex){
@@ -450,11 +558,22 @@ error_t parse_opt(int key, char *arg, struct argp_state *state){
         arguments->no_vert_scaling = 1;
         break;
     case 'c':
-        if (atoi(arg) == 24 || atoi(arg) == 8 || atoi(arg) == 7){
-            arguments->color_depth = atoi(arg);
+        if (arg[0] > 57 || arg[0] < 48){
+            printf("--color-depth called but no color depth defined\n\n");
+            argp_usage(state);
         }
-        else {
-            printf("Invalid color depth\nValid options are 24, 8 and 7\n");
+        int depth = atoi(arg);
+        switch (depth) {
+        case 24:
+        case 8:
+        case 7:
+        case 4:
+        case 3:
+        case 1:
+            arguments->color_depth = depth;
+            break;
+        default:
+            printf("Invalid color depth\n\n");
             argp_usage(state);
         }
         break;
@@ -538,6 +657,20 @@ void print_picture(ImageInfo *img, const struct winsize *term, int fast, int col
                 }
                 print_pixel_8bit(color_top, color_bot);
             }
+            else if (colordepth == 4 || colordepth == 3){
+                int extended = 0;
+                if (colordepth == 4){
+                    extended = 1;
+                }
+                if (img->c < 3){
+                    //Need code for grayscale
+                }
+                else{
+                    color_top = convert_systemcolor(img->data[(row * img->w * img->c) + (col * img->c)], img->data[(row * img->w * img->c) + (col * img->c) + 1], img->data[(row * img->w * img->c) + (col * img->c) + 2], extended);
+                    color_bot = convert_systemcolor(img->data[((row + offset) * img->w * img->c) + (col * img->c)], img->data[((row + offset) * img->w * img->c) + (col * img->c) + 1], img->data[((row + offset) * img->w * img->c) + (col * img->c) + 2], extended);
+                }
+                print_pixel_systemcolor(color_top, color_bot);
+            }
             
             col_out++;
         }
@@ -560,6 +693,21 @@ void print_pixel_24bit(unsigned char *top, unsigned char *bot, int ch_single){
         printf("%c[38;2;%d;%d;%dm", 0x1B, *top, *(top + 1), *(top + 2));
         printf("%c[48;2;%d;%d;%dm\u2580", 0x1B, *bot, *(bot + 1), *(bot + 2));
     }   
+}
+
+void print_pixel_systemcolor(unsigned char top, unsigned char bot){
+    if (top < 8){
+        printf("\033[%dm", top + 30);
+    }
+    else{
+        printf("\033[%dm", top + 82);
+    }
+    if (bot < 8){
+        printf("\033[%dm\u2580", bot + 40);
+    }
+    else{
+        printf("\033[%dm\u2580", bot + 92);
+    }
 }
 
 void set_term_mode_raw(struct termios *term_current){
