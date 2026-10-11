@@ -33,8 +33,9 @@ unsigned char convert_256(unsigned char r, unsigned char g, unsigned char b);
 unsigned char convert_bw(unsigned char r, unsigned char g, unsigned char b);
 unsigned char convert_color_88(unsigned char r, unsigned char g, unsigned char b);
 unsigned char convert_color_256(unsigned char r, unsigned char g, unsigned char b);
-unsigned char convert_grayscale_88(unsigned char value);
-unsigned char convert_grayscale_256(unsigned char value);
+unsigned char convert_grayscale(unsigned char r, unsigned char g, unsigned char b);
+unsigned char convert_grayscale_88(unsigned char r, unsigned char g, unsigned char b);
+unsigned char convert_grayscale_256(unsigned char r, unsigned char g, unsigned char b);
 unsigned char convert_systemcolor(unsigned char r, unsigned char g, unsigned char b, int extended);
 unsigned char get_ansi_level_88(unsigned char value);
 unsigned char get_ansi_level_256(unsigned char);
@@ -220,7 +221,7 @@ void apply_image_scale(ImageInfo *img, int scalefactor, int progress){
 
 unsigned char convert_88(unsigned char r, unsigned char g, unsigned char b){
     if (abs(r - g) < 12 && abs(g - b) < 12 && abs(r - b) < 12){
-        unsigned char gray_index = convert_grayscale_88((unsigned char) (((int) r + (int) g + (int) b) / 3));
+        unsigned char gray_index = convert_grayscale_88(r, g, b);
         unsigned char color_index = convert_color_88(r, g, b);
         unsigned char val_color[3], val_gray[3];
         if (gray_index > 80){
@@ -260,7 +261,7 @@ unsigned char convert_88(unsigned char r, unsigned char g, unsigned char b){
 
 unsigned char convert_256(unsigned char r, unsigned char g, unsigned char b){
     if (abs(r - g) < 12 && abs(g - b) < 12 && abs(r - b) < 12){
-        unsigned char gray_index = convert_grayscale_256((unsigned char) (((int) r + (int) g + (int) b) / 3));
+        unsigned char gray_index = convert_grayscale_256(r, g, b);
         unsigned char color_index = convert_color_256(r, g, b);
         unsigned char val_color[3], val_gray[3] = {8 + 10 * (gray_index - 232), 8 + 10 * (gray_index - 232), 8 + 10 * (gray_index - 232)};
         if (color_index == 16){
@@ -306,7 +307,12 @@ unsigned char convert_color_256(unsigned char r, unsigned char g, unsigned char 
     return (unsigned char) 16 + (36 * get_ansi_level_256(r)) + (6 * get_ansi_level_256(g)) + get_ansi_level_256(b);
 }
 
-unsigned char convert_grayscale_88(unsigned char value){
+unsigned char convert_grayscale(unsigned char r, unsigned char g, unsigned char b){
+    return ((float)r * 0.2989) + ((float)g * 0.5870) + ((float)b * 0.1140);
+}
+
+unsigned char convert_grayscale_88(unsigned char r, unsigned char g, unsigned char b){
+    float value = (float) convert_grayscale(r, g, b);
     if (value < 29){
         return 16;
     }
@@ -317,11 +323,12 @@ unsigned char convert_grayscale_88(unsigned char value){
         return 79;
     }
     else{
-        return roundf(((float)value - 92) / 23.2) + 81;
+        return roundf((value - 92) / 23.2) + 81;
     }
 }
 
-unsigned char convert_grayscale_256(unsigned char value){
+unsigned char convert_grayscale_256(unsigned char r, unsigned char g, unsigned char b){
+    float value = (float) convert_grayscale(r, g, b);
     if (value < 5){
         return 16;
     }
@@ -329,7 +336,7 @@ unsigned char convert_grayscale_256(unsigned char value){
         return 231;
     }
     else{
-        return roundf(((float)value - 8) / 10) + 232;
+        return roundf((value - 8) / 10) + 232;
     }
 }
 
