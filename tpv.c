@@ -106,7 +106,7 @@ int main(int argc, char **argv){
         arguments.color_depth = colordepth;
     }
     else if (arguments.color_depth > colordepth){
-        printf("Requested color depth is higher than maximum supported by terminal\n");
+        printf("tpv: c %d: requested color depth is higher than maximum supported by terminal\n", arguments.color_depth);
         goto cleanup;
     }
     if (arguments.color_depth <= 4){
@@ -560,7 +560,7 @@ error_t parse_opt(int key, char *arg, struct argp_state *state){
         break;
     case 'c':
         if (arg[0] > 57 || arg[0] < 48){
-            printf("--color-depth called but no color depth defined\n\n");
+            printf("tpv: c: no color depth defined\n\n");
             argp_usage(state);
         }
         int depth = atoi(arg);
@@ -574,7 +574,7 @@ error_t parse_opt(int key, char *arg, struct argp_state *state){
             arguments->color_depth = depth;
             break;
         default:
-            printf("Invalid color depth\n\n");
+            printf("tpv: c %d: invalid color depth\n\n", depth);
             argp_usage(state);
         }
         break;
