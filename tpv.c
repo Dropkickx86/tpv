@@ -241,7 +241,7 @@ void apply_image_scale(ImageInfo *img, int scalefactor, int progress){
 }
 
 unsigned char convert_88(unsigned char r, unsigned char g, unsigned char b){
-    if (abs(r - g) < 12 && abs(g - b) < 12 && abs(r - b) < 12){
+    if (abs(r - g) < 10 && abs(g - b) < 10 && abs(r - b) < 10){
         unsigned char gray_index = convert_grayscale_88(r, g, b);
         unsigned char color_index = convert_color_88(r, g, b);
         unsigned char val_color[3], val_gray[3];
@@ -281,7 +281,7 @@ unsigned char convert_88(unsigned char r, unsigned char g, unsigned char b){
 }
 
 unsigned char convert_256(unsigned char r, unsigned char g, unsigned char b){
-    if (abs(r - g) < 12 && abs(g - b) < 12 && abs(r - b) < 12){
+    if (abs(r - g) < 10 && abs(g - b) < 10 && abs(r - b) < 10){
         unsigned char gray_index = convert_grayscale_256(r, g, b);
         unsigned char color_index = convert_color_256(r, g, b);
         unsigned char val_color[3], val_gray[3] = {8 + 10 * (gray_index - 232), 8 + 10 * (gray_index - 232), 8 + 10 * (gray_index - 232)};
@@ -325,9 +325,6 @@ unsigned char convert_color_88(unsigned char r, unsigned char g, unsigned char b
 }
 
 unsigned char convert_color_256(unsigned char r, unsigned char g, unsigned char b){
-    unsigned char temp1 = get_ansi_level_256(r);
-    unsigned char temp2 = get_ansi_level_256(g);
-    unsigned char temp3 = get_ansi_level_256(b);
     return (unsigned char) 16 + (36 * get_ansi_level_256(r)) + (6 * get_ansi_level_256(g)) + get_ansi_level_256(b);
 }
 
@@ -365,6 +362,42 @@ unsigned char convert_grayscale_256(unsigned char r, unsigned char g, unsigned c
 }
 
 unsigned char convert_systemcolor(unsigned char r, unsigned char g, unsigned char b, int extended){
+    #ifndef NO_SATURATION_INCREASE
+    if (abs(r - g) > 40 || abs(r - b) > 40 || abs(g - b) > 40){
+        unsigned char gray_value = convert_grayscale(r, g, b);
+        int rn = gray_value + ((r - gray_value) * 10);
+        int gn = gray_value + ((g - gray_value) * 10);
+        int bn = gray_value + ((b - gray_value) * 10);
+        if (rn > 255){
+            r = 255;
+        }
+        else if (rn < 0) {
+            r = 0;
+        }
+        else{
+            r = rn;
+        }
+        if (gn > 255){
+            g = 255;
+        }
+        else if (gn < 0) {
+            g = 0;
+        }
+        else {
+            g = gn;
+        }
+        if (bn > 255){
+            b = 255;
+        }
+        else if (bn < 0) {
+            b = 0;
+        }
+        else{
+            b = bn;
+        }
+    }
+    #endif
+    
     unsigned char color[3] = {r, g, b};
     float closestvalue = 442.0;
     int closestindex = 0;

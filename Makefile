@@ -7,6 +7,10 @@ SRC = tpv.c
 OBJ = $(SRC:.c=.o)
 TARGET = tpv
 
+ifdef nsatinc
+	CFLAGS += -DNO_SATURATION_INCREASE
+endif
+
 $(TARGET): $(OBJ)
 	$(CC) $(OBJ) -o $(TARGET) $(LDFLAGS)
 
