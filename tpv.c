@@ -28,14 +28,14 @@ typedef struct {
 
 unsigned char apply_image_alpha(unsigned char color, unsigned char bg, unsigned char a);
 void apply_image_scale(ImageInfo *img, int scalefactor, int progress);
-unsigned char convert_bw(unsigned char r, unsigned char g, unsigned char b);
-unsigned char convert_systemcolor(unsigned char r, unsigned char g, unsigned char b, int extended);
 unsigned char convert_88(unsigned char r, unsigned char g, unsigned char b);
-unsigned char convert_color_88(unsigned char r, unsigned char g, unsigned char b);
-unsigned char convert_grayscale_88(unsigned char value);
 unsigned char convert_256(unsigned char r, unsigned char g, unsigned char b);
+unsigned char convert_bw(unsigned char r, unsigned char g, unsigned char b);
+unsigned char convert_color_88(unsigned char r, unsigned char g, unsigned char b);
 unsigned char convert_color_256(unsigned char r, unsigned char g, unsigned char b);
+unsigned char convert_grayscale_88(unsigned char value);
 unsigned char convert_grayscale_256(unsigned char value);
+unsigned char convert_systemcolor(unsigned char r, unsigned char g, unsigned char b, int extended);
 unsigned char get_ansi_level_88(unsigned char value);
 unsigned char get_ansi_level_256(unsigned char);
 float get_euclidean_distance_3D(unsigned char *p1, unsigned char *p2);
@@ -218,33 +218,6 @@ void apply_image_scale(ImageInfo *img, int scalefactor, int progress){
     }
 }
 
-unsigned char convert_bw(unsigned char r, unsigned char g, unsigned char b){
-    unsigned char value = (r + g + b) / 3;
-    if (value > 127){
-        return 1;
-    }
-    else{
-        return 0;
-    }
-}
-
-unsigned char convert_systemcolor(unsigned char r, unsigned char g, unsigned char b, int extended){
-    unsigned char color[3] = {r, g, b};
-    float closestvalue = 442.0;
-    int closestindex = 0;
-    for (int i = 0; i < 7 + (8 * extended); i++){
-        float value = get_euclidean_distance_3D(color, palette[i]);
-        if (value == 0){
-            return (unsigned char) i;
-        }
-        else if (value < closestvalue){
-            closestvalue = value;
-            closestindex = i;
-        }
-    }
-    return (unsigned char) closestindex;
-}
-
 unsigned char convert_88(unsigned char r, unsigned char g, unsigned char b){
     if (abs(r - g) < 12 && abs(g - b) < 12 && abs(r - b) < 12){
         unsigned char gray_index = convert_grayscale_88((unsigned char) (((int) r + (int) g + (int) b) / 3));
@@ -285,25 +258,6 @@ unsigned char convert_88(unsigned char r, unsigned char g, unsigned char b){
     }
 }
 
-unsigned char convert_color_88(unsigned char r, unsigned char g, unsigned char b){
-    return (unsigned char) 16 + (16 * get_ansi_level_88(r)) + (4 * get_ansi_level_88(g)) + get_ansi_level_88(b);
-}
-
-unsigned char convert_grayscale_88(unsigned char value){
-    if (value < 29){
-        return 16;
-    }
-    else if (value < 70){
-        return 80;
-    }
-    else if (value > 243){
-        return 79;
-    }
-    else{
-        return roundf(((float)value - 92) / 23.2) + 81;
-    }
-}
-
 unsigned char convert_256(unsigned char r, unsigned char g, unsigned char b){
     if (abs(r - g) < 12 && abs(g - b) < 12 && abs(r - b) < 12){
         unsigned char gray_index = convert_grayscale_256((unsigned char) (((int) r + (int) g + (int) b) / 3));
@@ -334,8 +288,37 @@ unsigned char convert_256(unsigned char r, unsigned char g, unsigned char b){
     }
 }
 
+unsigned char convert_bw(unsigned char r, unsigned char g, unsigned char b){
+    unsigned char value = (r + g + b) / 3;
+    if (value > 127){
+        return 1;
+    }
+    else{
+        return 0;
+    }
+}
+
+unsigned char convert_color_88(unsigned char r, unsigned char g, unsigned char b){
+    return (unsigned char) 16 + (16 * get_ansi_level_88(r)) + (4 * get_ansi_level_88(g)) + get_ansi_level_88(b);
+}
+
 unsigned char convert_color_256(unsigned char r, unsigned char g, unsigned char b){
     return (unsigned char) 16 + (36 * get_ansi_level_256(r)) + (6 * get_ansi_level_256(g)) + get_ansi_level_256(b);
+}
+
+unsigned char convert_grayscale_88(unsigned char value){
+    if (value < 29){
+        return 16;
+    }
+    else if (value < 70){
+        return 80;
+    }
+    else if (value > 243){
+        return 79;
+    }
+    else{
+        return roundf(((float)value - 92) / 23.2) + 81;
+    }
 }
 
 unsigned char convert_grayscale_256(unsigned char value){
@@ -348,6 +331,23 @@ unsigned char convert_grayscale_256(unsigned char value){
     else{
         return roundf(((float)value - 8) / 10) + 232;
     }
+}
+
+unsigned char convert_systemcolor(unsigned char r, unsigned char g, unsigned char b, int extended){
+    unsigned char color[3] = {r, g, b};
+    float closestvalue = 442.0;
+    int closestindex = 0;
+    for (int i = 0; i < 7 + (8 * extended); i++){
+        float value = get_euclidean_distance_3D(color, palette[i]);
+        if (value == 0){
+            return (unsigned char) i;
+        }
+        else if (value < closestvalue){
+            closestvalue = value;
+            closestindex = i;
+        }
+    }
+    return (unsigned char) closestindex;
 }
 
 unsigned char get_ansi_level_88(unsigned char value){
