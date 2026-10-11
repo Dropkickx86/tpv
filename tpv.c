@@ -11,11 +11,12 @@
 #include "stb_image.h"
 
 struct arguments {
-    char *args[7];
+    char *args[8];
     int fast;
     int no_scaling;
     int no_vert_scaling;
     int color_depth;
+    int grayscale;
     int arg_inline;
     int progress;
     char *filepath;
@@ -61,6 +62,7 @@ struct argp_option options[] = {
     {"no-scaling", 'n', 0, 0, "Prints image without scaling it down to fit the terminal window", 0},
     {"no-vert-scaling", 'v', 0, 0, "Prints image after scaling it down to fit on width, ignoring image height", 0},
     {"color-depth", 'c', "depth", 0, "Choose color depth. Defaults to highest capability of terminal", 0},
+    {"grayscale", 'g', 0, 0, "Print in grayscale", 0},
     {"inline", 'i', 0, 0, "Prints without clearing the screen", 0},
     {"progress", 'p', 0, 0, "Prints the progress when scaling images", 0},
     {"help", 'h', 0, 0, "Shows this help list", 0},
@@ -87,13 +89,12 @@ unsigned char palette[16][3] = {
 };
 
 int main(int argc, char **argv){
-    convert_systemcolor(0, 0, 0, 0);
-    
     struct arguments arguments;
     arguments.fast = 0;
     arguments.no_scaling = 0;
     arguments.no_vert_scaling = 0;
     arguments.color_depth = 0;
+    arguments.grayscale = 0;
     arguments.arg_inline = 0;
     arguments.progress = 0;
     arguments.filepath = "";
@@ -130,7 +131,27 @@ int main(int argc, char **argv){
         }
     }
 
-    //alpha
+    //common handling
+    if (arguments.grayscale && img.c > 2){
+        for (int pixel = 0; pixel < (img.h * img.w * img.c); pixel += img.c){
+            unsigned char value;
+            if (arguments.color_depth < 4){
+                value = convert_bw(img.data[pixel], img.data[pixel + 1], img.data[pixel + 2]);
+                if (value){
+                    value = palette[7][0];
+                }
+                else{
+                    value = palette[0][0];
+                }
+            }
+            else {
+                value = convert_grayscale(img.data[pixel], img.data[pixel + 1], img.data[pixel + 2]);
+            }
+            img.data[pixel] = value;
+            img.data[pixel + 1] = value;
+            img.data[pixel + 2] = value;
+        }
+    }
     if (img.c == 2 || img.c == 4){
         for (int pixel = 0; pixel < (img.h * img.w * img.c); pixel += img.c){
             for (int offset = 0; offset < img.c - 1; offset++){
@@ -290,7 +311,7 @@ unsigned char convert_256(unsigned char r, unsigned char g, unsigned char b){
 }
 
 unsigned char convert_bw(unsigned char r, unsigned char g, unsigned char b){
-    unsigned char value = (r + g + b) / 3;
+    unsigned char value = convert_grayscale(r, g, b);
     if (value > 127){
         return 1;
     }
@@ -304,6 +325,9 @@ unsigned char convert_color_88(unsigned char r, unsigned char g, unsigned char b
 }
 
 unsigned char convert_color_256(unsigned char r, unsigned char g, unsigned char b){
+    unsigned char temp1 = get_ansi_level_256(r);
+    unsigned char temp2 = get_ansi_level_256(g);
+    unsigned char temp3 = get_ansi_level_256(b);
     return (unsigned char) 16 + (36 * get_ansi_level_256(r)) + (6 * get_ansi_level_256(g)) + get_ansi_level_256(b);
 }
 
@@ -344,7 +368,7 @@ unsigned char convert_systemcolor(unsigned char r, unsigned char g, unsigned cha
     unsigned char color[3] = {r, g, b};
     float closestvalue = 442.0;
     int closestindex = 0;
-    for (int i = 0; i < 7 + (8 * extended); i++){
+    for (int i = 0; i < 8 + (8 * extended); i++){
         float value = get_euclidean_distance_3D(color, palette[i]);
         if (value == 0){
             return (unsigned char) i;
@@ -393,8 +417,8 @@ unsigned char get_ansi_level_256(unsigned char value){
 
 float get_euclidean_distance_3D(unsigned char *p1, unsigned char *p2){
     int dist_r = (p1[0] - p2[0]) * (p1[0] - p2[0]);
-    int dist_g = (p1[0] - p2[0]) * (p1[0] - p2[0]);
-    int dist_b = (p1[0] - p2[0]) * (p1[0] - p2[0]);
+    int dist_g = (p1[1] - p2[1]) * (p1[1] - p2[1]);
+    int dist_b = (p1[2] - p2[2]) * (p1[2] - p2[2]);
     int dist_tot = dist_r + dist_g + dist_b;
     return sqrtf((float) dist_tot);
 }
@@ -585,6 +609,9 @@ error_t parse_opt(int key, char *arg, struct argp_state *state){
             argp_usage(state);
         }
         break;
+    case 'g':
+        arguments->grayscale = 1;
+        break;
     case 'i':
         arguments->arg_inline = 1;
         break;
@@ -696,7 +723,6 @@ void print_picture(ImageInfo *img, const struct winsize *term, int fast, int col
                 }
                 print_pixel_bw(color_top, color_bot);
             }
-            
             col_out++;
         }
         printf("%c[0m\n", 0x1B);
