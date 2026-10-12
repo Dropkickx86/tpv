@@ -10,6 +10,9 @@ TARGET = tpv
 ifdef nsatinc
 	CFLAGS += -DNO_SATURATION_INCREASE
 endif
+ifdef truebw
+	CFLAGS += -DTRUE_BW
+endif
 
 $(TARGET): $(OBJ)
 	$(CC) $(OBJ) -o $(TARGET) $(LDFLAGS)

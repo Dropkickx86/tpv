@@ -124,6 +124,11 @@ RECENT REVISION HISTORY:
   To add your name to the credits, pick a random blank space in the middle and fill it.
   80% of merge conflicts on stb PRs are due to people adding their name at the end
   of the credits.
+
+
+  Code was patched for inclusion in tpv to fix a GCC compiler warning caused by
+  STBI_FAILURE_USERMSG being set. Fix by user grandchild in pull request #1402,
+  https://github.com/nothings/stb/pull/1402.
 */
 
 #ifndef STBI_INCLUDE_STB_IMAGE_H
@@ -5242,7 +5247,7 @@ static int stbi__parse_png_file(stbi__png *z, int scan, int req_comp)
             // if critical, fail
             if (first) return stbi__err("first not IHDR", "Corrupt PNG");
             if ((c.type & (1 << 29)) == 0) {
-               #ifndef STBI_NO_FAILURE_STRINGS
+               #if !defined(STBI_NO_FAILURE_STRINGS) && !defined(STBI_FAILURE_USERMSG)
                // not threadsafe
                static char invalid_chunk[] = "XXXX PNG chunk not known";
                invalid_chunk[0] = STBI__BYTECAST(c.type >> 24);
