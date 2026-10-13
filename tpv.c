@@ -145,7 +145,7 @@ int main(int argc, char **argv){
     if (arguments.grayscale && img.c > 2){
         for (int pixel = 0; pixel < (img.h * img.w * img.c); pixel += img.c){
             unsigned char value;
-            if (arguments.color_depth < 4){
+            if (arguments.color_depth <= 4){
                 value = convert_bw(&img.data[pixel]);
                 if (value){
                     value = palette[palette_bw[1]][0];
@@ -579,8 +579,7 @@ void get_term_colorpalette(){
     fflush(stdin);
     tcsetattr(STDIN_FILENO, TCSANOW, &term_old);
     #ifdef TRUE_BW
-    float dist_white = 442, dist_black = 442;
-    unsigned char color_black[3] = {0, 0, 0}, color_white[3] = {255, 255, 255};
+    int bestblack = 765, bestwhite = 0;
     #endif
     while (buffer[1] == ']' && buffer[0] != '\0'){
         int i, offset = 10;
@@ -602,14 +601,13 @@ void get_term_colorpalette(){
         palette[i][2] = (unsigned char)strtol(temp, NULL, 16);
         next_entry(buffer);
         #ifdef TRUE_BW
-        float dist_black_cur = get_euclidean_distance_3D(palette[i], color_black);
-        float dist_white_cur = get_euclidean_distance_3D(palette[i], color_white);
-        if (dist_black_cur < dist_black){
-            dist_black = dist_black_cur;
+        int lightlevel = palette[i] + palette[i + 1], palette[i + 2];
+        if (lightlevel < bestblack){
+            bestblack = lightlevel;
             palette_bw[0] = i;
         }
-        if (dist_white_cur < dist_white){
-            dist_white = dist_white_cur;
+        if (lightlevel > bestwhite){
+            bestwhite = lightlevel;
             palette_bw[1] = i;
         }
         #endif
