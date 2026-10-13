@@ -4,7 +4,7 @@ TPV is a simple tool for printing images in the terminal, basically a CAT for im
 
 ## Supported formats
 
-The range of formats is decided by stb_image.h which is used for the decoding.
+The range of formats is decided by stb_image which is used for the decoding.
 
 By their own quick documentation:
 
@@ -14,11 +14,13 @@ PNG 1/2/4/8/16-bit-per-channel
 TGA (not sure what subset, if a subset)
 BMP non-1bpp, non-RLE
 PSD (composited view only, no extra channels, 8/16 bit-per-channel)
-GIF (*comp always reports as 4-channel)
+~~GIF (*comp always reports as 4-channel)~~
 HDR (radiance rgbE format)
 PIC (Softimage PIC)
 PNM (PPM and PGM binary only)
 ```
+
+Even though GIF is supported by stb_image, it is not supported by TPV.
 
 More detailed information in [their project](https://github.com/nothings/stb).
 
