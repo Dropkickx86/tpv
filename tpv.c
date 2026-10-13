@@ -1,3 +1,9 @@
+/*BSD 3-Clause License
+
+Copyright (c) 2026, Emil Stenström
+
+Full license information in LICENSE file*/
+
 #include <argp.h>
 #include <asm-generic/errno-base.h>
 #include <errno.h>
