@@ -8,15 +8,17 @@ The range of formats is decided by stb_image.h which is used for the decoding.
 
 By their own quick documentation:
 
-> JPEG baseline & progressive (12 bpc/arithmetic not supported, same as stock IJG lib)
-> PNG 1/2/4/8/16-bit-per-channel
-> TGA (not sure what subset, if a subset)
-> BMP non-1bpp, non-RLE
-> PSD (composited view only, no extra channels, 8/16 bit-per-channel)
-> GIF (*comp always reports as 4-channel)
-> HDR (radiance rgbE format)
-> PIC (Softimage PIC)
-> PNM (PPM and PGM binary only)
+```
+JPEG baseline & progressive (12 bpc/arithmetic not supported, same as stock IJG lib)
+PNG 1/2/4/8/16-bit-per-channel
+TGA (not sure what subset, if a subset)
+BMP non-1bpp, non-RLE
+PSD (composited view only, no extra channels, 8/16 bit-per-channel)
+GIF (*comp always reports as 4-channel)
+HDR (radiance rgbE format)
+PIC (Softimage PIC)
+PNM (PPM and PGM binary only)
+```
 
 More detailed information in [their project](https://github.com/nothings/stb).
 
@@ -26,11 +28,15 @@ Usage of TPV is really simple, just provide the path to an image and it will be 
 
 Options are availible for printing in different color depths, grayscale etc. All options can be listed by running
 
-> tpv -h
+```
+tpv -h
+```
 
 or
 
-> tpv --help
+```
+tpv --help
+```
 
 More information about the options can be found in the manpage for TPV.
 
@@ -38,7 +44,9 @@ More information about the options can be found in the manpage for TPV.
 
 Each release of TPV is distributed precompiled for Debian as a DEB package. However, it should compile on any glibc-system. Just download the source code and run
 
-> make install
+```
+make install
+```
 
 and TPV will be installed along with its documentation.
 
