@@ -5,8 +5,6 @@ Copyright (c) 2026, Emil Stenström
 Full license information in LICENSE file*/
 
 #include <argp.h>
-#include <asm-generic/errno-base.h>
-#include <errno.h>
 #include <math.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -19,6 +17,9 @@ Full license information in LICENSE file*/
 #define STBI_FAILURE_USERMSG
 #define STBI_NO_GIF
 #include "stb_image.h"
+
+#define true 1
+#define false 0
 
 struct arguments {
     int fast;
@@ -62,7 +63,7 @@ void print_pixel_8bit(unsigned char top, unsigned char bot);
 void print_pixel_24bit(unsigned char *top, unsigned char *bot);
 void print_pixel_bw(unsigned char top, unsigned char bot);
 void print_pixel_systemcolor(unsigned char top, unsigned char bot);
-void set_term_mode_raw(struct termios *term_current);
+int set_term_mode_raw(struct termios *term_current);
 
 int errno_safe = 0;
 char doc[] = "CLI tool to print images in terminal";
@@ -101,27 +102,27 @@ unsigned char palette_bw[2] = {0, 7};
 
 int main(int argc, char **argv){
     //Argument parsing, can terminate execution
-    struct arguments arguments = {0};
+    struct arguments arguments = {false};
     argp_parse(&argp, argc, argv, ARGP_NO_HELP, 0, &arguments);
 
     //Variable declarations, definitions, checks
     const struct winsize term = get_term_size();
     if (term.ws_row == 0){
         printf("tpv: failed getting terminal size");
-        return errno_safe;
+        return EXIT_FAILURE;
     }
     unsigned char termbg[3] = {0};
     get_term_bg(termbg);
     int colordepth = get_term_colordepth();
-    if (colordepth == 1 && errno_safe != 0){
-        return errno_safe;
+    if (colordepth < 0){
+        return EXIT_FAILURE;
     }
-    else if (arguments.color_depth == 0){
+    else if (!arguments.color_depth){
         arguments.color_depth = colordepth;
     }
     else if (arguments.color_depth > colordepth){
         printf("tpv: c %d: requested color depth is higher than maximum supported by terminal\n", arguments.color_depth);
-        return EINVAL;
+        return EXIT_FAILURE;
     }
     if (arguments.color_depth <= 4){
         get_term_colorpalette();
@@ -200,7 +201,7 @@ int main(int argc, char **argv){
 
     //cleanup
     free(img.data);
-    return 0;
+    return EXIT_SUCCESS;
 }
 
 unsigned char apply_image_alpha(unsigned char color, unsigned char bg, unsigned char a){
@@ -473,9 +474,7 @@ void get_term_bg(unsigned char *bg_col){
     struct termios term_old;
     char buffer[64] = {0};
     int inamount = 0;
-    set_term_mode_raw(&term_old);
-    if (errno_safe != 0){
-        errno_safe = 0;
+    if (!set_term_mode_raw(&term_old)){
         return;
     }
     printf("\033]11;?\007");
@@ -501,9 +500,8 @@ int get_term_colordepth(){
     const char *env_colorterm = getenv("COLORTERM");
     const char *env_term = getenv("TERM");
     int inamount = 0;
-    set_term_mode_raw(&term_old);
-    if (errno_safe != 0){
-        return 1;
+    if (!set_term_mode_raw(&term_old)){
+        return -1;
     }
     printf("\033[38;2;1;2;3m");
     printf("\033P$qm\033\\");
@@ -555,9 +553,7 @@ void get_term_colorpalette(){
     struct termios term_old;
     char buffer[430] = {0};
     int inamount = 0;
-    set_term_mode_raw(&term_old);
-    if (errno_safe != 0){
-        errno_safe = 0;
+    if (!set_term_mode_raw(&term_old)){
         return;
     }
     printf("\033]4;0;?\033\\");
@@ -623,7 +619,6 @@ void get_term_colorpalette(){
 struct winsize get_term_size(){
     struct winsize term;
     if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &term) == -1){
-        errno_safe = errno;
         term.ws_row = 1;
     }
     term.ws_row -= 1;
@@ -655,13 +650,13 @@ error_t parse_opt(int key, char *arg, struct argp_state *state){
     struct arguments *arguments = state->input;
     switch (key){
     case 'f':
-        arguments->fast = 1;
+        arguments->fast = true;
         break;
     case 'n':
-        arguments->no_scaling = 1;
+        arguments->no_scaling = true;
         break;
     case 'v':
-        arguments->no_vert_scaling = 1;
+        arguments->no_vert_scaling = true;
         break;
     case 'c':
         if (arg[0] > 57 || arg[0] < 48){
@@ -684,13 +679,13 @@ error_t parse_opt(int key, char *arg, struct argp_state *state){
         }
         break;
     case 'g':
-        arguments->grayscale = 1;
+        arguments->grayscale = true;
         break;
     case 'i':
-        arguments->arg_inline = 1;
+        arguments->arg_inline = true;
         break;
     case 'p':
-        arguments->progress = 1;
+        arguments->progress = true;
         break;
     case 'h':
         argp_state_help(state, stdout, ARGP_HELP_STD_HELP);
@@ -758,9 +753,9 @@ void print_picture(ImageInfo *img, const struct winsize *term, int fast, int col
                 print_pixel_8bit(convert_88(color_top), convert_88(color_bot));
             }
             else if (colordepth <= 4){
-                int extended = 0;
+                int extended = false;
                 if (colordepth == 4){
-                    extended = 1;
+                    extended = true;
                 }
                 if (img->c < 3 || colordepth == 1){
                     print_pixel_bw(convert_bw(color_top), convert_bw(color_bot));
@@ -816,20 +811,19 @@ void print_pixel_systemcolor(unsigned char top, unsigned char bot){
     }
 }
 
-void set_term_mode_raw(struct termios *term_current){
+int set_term_mode_raw(struct termios *term_current){
     struct termios term_raw;
     if (tcgetattr(STDIN_FILENO, term_current) == -1){
-        errno_safe = errno;
         printf("tpv: could not get terminal attributes");
-        return;
+        return false;
     }
     term_raw = *term_current;
     term_raw.c_lflag &= ~(ICANON | ECHO);
     term_raw.c_cc[VMIN] = 0;
     term_raw.c_cc[VTIME] = 5;
     if (tcsetattr(STDIN_FILENO, TCSANOW, &term_raw) == -1){
-        errno_safe = errno;
         printf("tpv: could not set terminal attributes");
-        return;
+        return false;
     }
+    return true;
 }
