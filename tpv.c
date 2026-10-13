@@ -3,7 +3,7 @@
 Copyright (c) 2026, Emil Stenström
 
 Full license information in LICENSE file*/
-
+//System libraries
 #include <argp.h>
 #include <math.h>
 #include <stdlib.h>
@@ -13,14 +13,17 @@ Full license information in LICENSE file*/
 #include <unistd.h>
 #include <sys/ioctl.h>
 
+//STB_IMAGE settings and include
 #define STB_IMAGE_IMPLEMENTATION
 #define STBI_FAILURE_USERMSG
 #define STBI_NO_GIF
 #include "stb_image.h"
 
+//Local defines
 #define true 1
 #define false 0
 
+//Structs
 struct arguments {
     int fast;
     int no_scaling;
@@ -31,12 +34,12 @@ struct arguments {
     int progress;
     char *filepath;
 };
-
 typedef struct {
     int w, h, c;
     unsigned char *data;
 } ImageInfo;
 
+//Functions
 unsigned char apply_image_alpha(unsigned char color, unsigned char bg, unsigned char a);
 void apply_image_scale(ImageInfo *img, int scalefactor, int progress);
 unsigned char convert_88(unsigned char *color);
@@ -65,6 +68,7 @@ void print_pixel_bw(unsigned char top, unsigned char bot);
 void print_pixel_systemcolor(unsigned char top, unsigned char bot);
 int set_term_mode_raw(struct termios *term_current);
 
+//Global vars and arrays
 int errno_safe = 0;
 char doc[] = "CLI tool to print images in terminal";
 char args_doc[] = "filepath";
