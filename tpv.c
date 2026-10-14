@@ -130,11 +130,16 @@ int main(int argc, char **argv){
     }
     if (arguments.color_depth <= 4){
         get_term_colorpalette();
+        #ifndef TRUE_BW
+        if (arguments.color_depth == 4){
+            palette_bw[1] = 15;
+        }
+        #endif
     }
     ImageInfo img;
     img.data = stbi_load(arguments.filepath, &img.w, &img.h, &img.c, 0);
     if (!img.data){
-        printf("%s", stbi_failure_reason());
+        printf("%s\n", stbi_failure_reason());
         return EXIT_FAILURE;
     }
 
@@ -487,7 +492,6 @@ void get_term_bg(unsigned char *bg_col){
     do {
         inamount += read(STDIN_FILENO, buffer + inamount, sizeof(buffer) - 1);
     } while (buffer[inamount - 1] != 'c');
-    fflush(stdin);
     tcsetattr(STDIN_FILENO, TCSANOW, &term_old);
     if (buffer[1] == ']'){
         unsigned int r, g, b;
@@ -520,7 +524,6 @@ int get_term_colordepth(){
     do {
         inamount += read(STDIN_FILENO, buffer + inamount, sizeof(buffer) - 1);
     } while (buffer[inamount - 1] != 'c');
-    fflush(stdin);
     tcsetattr(STDIN_FILENO, TCSANOW, &term_old);
     while (buffer[1] == 'P' && buffer[0] != '\0'){ 
         if (buffer[2] == '1' && buffer[5] != '0'){
@@ -582,7 +585,6 @@ void get_term_colorpalette(){
     do {
         inamount += read(STDIN_FILENO, buffer + inamount, sizeof(buffer) - 1);
     } while (buffer[inamount - 1] != 'c');
-    fflush(stdin);
     tcsetattr(STDIN_FILENO, TCSANOW, &term_old);
     #ifdef TRUE_BW
     int bestblack = 765, bestwhite = 0;
