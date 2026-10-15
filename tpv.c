@@ -73,14 +73,14 @@ int errno_safe = 0;
 char doc[] = "CLI tool to print images in terminal";
 char args_doc[] = "filepath";
 struct argp_option options[] = {
-    {"fast", 'f', 0, 0, "Prints image by skipping pixels instead of scaling. Fast but inaccurate", 0},
-    {"no-scaling", 'n', 0, 0, "Prints image without scaling it down to fit the terminal window", 0},
-    {"no-vert-scaling", 'v', 0, 0, "Prints image after scaling it down to fit on width, ignoring image height", 0},
     {"color-depth", 'c', "depth", 0, "Choose color depth. Defaults to highest capability of terminal", 0},
+    {"fast", 'f', 0, 0, "Prints image by skipping pixels instead of scaling. Fast but inaccurate", 0},
     {"grayscale", 'g', 0, 0, "Print in grayscale", 0},
-    {"inline", 'i', 0, 0, "Prints without clearing the screen", 0},
-    {"progress", 'p', 0, 0, "Prints the progress when scaling images", 0},
     {"help", 'h', 0, 0, "Shows this help list", 0},
+    {"inline", 'i', 0, 0, "Prints without clearing the screen", 0},
+    {"no-scaling", 'n', 0, 0, "Prints image without scaling it down to fit the terminal window", 0},
+    {"progress", 'p', 0, 0, "Prints the progress when scaling images", 0},
+    {"no-vert-scaling", 'v', 0, 0, "Prints image after scaling it down to fit on width, ignoring image height", 0},
     {0},
 };
 struct argp argp = {options, parse_opt, args_doc, doc, 0, 0, 0};
@@ -107,6 +107,9 @@ unsigned char palette_bw[2] = {0, 7};
 int main(int argc, char **argv){
     //Argument parsing, can terminate execution
     struct arguments arguments = {false};
+    #ifdef DEFAULT_INLINE
+    arguments.arg_inline = true;
+    #endif
     argp_parse(&argp, argc, argv, ARGP_NO_HELP, 0, &arguments);
 
     //Variable declarations, definitions, checks
@@ -655,15 +658,6 @@ void next_entry(char *buffer){
 error_t parse_opt(int key, char *arg, struct argp_state *state){
     struct arguments *arguments = state->input;
     switch (key){
-    case 'f':
-        arguments->fast = true;
-        break;
-    case 'n':
-        arguments->no_scaling = true;
-        break;
-    case 'v':
-        arguments->no_vert_scaling = true;
-        break;
     case 'c':
         if (arg[0] > 57 || arg[0] < 48){
             printf("tpv: c: no color depth defined\n\n");
@@ -684,17 +678,30 @@ error_t parse_opt(int key, char *arg, struct argp_state *state){
             argp_usage(state);
         }
         break;
+    case 'f':
+        arguments->fast = true;
+        break;
     case 'g':
         arguments->grayscale = true;
         break;
+    case 'h':
+        argp_state_help(state, stdout, ARGP_HELP_STD_HELP);
+        break;
     case 'i':
+        #ifndef DEFAULT_INLINE
         arguments->arg_inline = true;
+        #else
+        arguments->arg_inline = false;
+        #endif
+        break;
+    case 'n':
+        arguments->no_scaling = true;
         break;
     case 'p':
         arguments->progress = true;
         break;
-    case 'h':
-        argp_state_help(state, stdout, ARGP_HELP_STD_HELP);
+    case 'v':
+        arguments->no_vert_scaling = true;
         break;
     case ARGP_KEY_ARG:
         arguments->filepath = arg;
