@@ -612,7 +612,7 @@ void get_term_colorpalette(){
         palette[i][2] = (unsigned char)strtol(temp, NULL, 16);
         next_entry(buffer);
         #ifdef TRUE_BW
-        int lightlevel = palette[i] + palette[i + 1], palette[i + 2];
+        int lightlevel = palette[i][0] + palette[i][1] + palette[i][2];
         if (lightlevel < bestblack){
             bestblack = lightlevel;
             palette_bw[0] = i;
