@@ -73,14 +73,14 @@ int errno_safe = 0;
 char doc[] = "CLI tool to print images in terminal";
 char args_doc[] = "filepath";
 struct argp_option options[] = {
-    {"color-depth", 'c', "depth", 0, "Choose color depth. Defaults to highest capability of terminal", 0},
-    {"fast", 'f', 0, 0, "Prints image by skipping pixels instead of scaling. Fast but inaccurate", 0},
+    {"color-depth", 'c', "depth", 0, "Choose color depth", 0},
+    {"fast", 'f', 0, 0, "Print image by skipping pixels instead of scaling", 0},
     {"grayscale", 'g', 0, 0, "Print in grayscale", 0},
-    {"help", 'h', 0, 0, "Shows this help list", 0},
-    {"inline", 'i', 0, 0, "Prints without clearing the screen", 0},
-    {"no-scaling", 'n', 0, 0, "Prints image without scaling it down to fit the terminal window", 0},
-    {"progress", 'p', 0, 0, "Prints the progress when scaling images", 0},
-    {"no-vert-scaling", 'v', 0, 0, "Prints image after scaling it down to fit on width, ignoring image height", 0},
+    {"help", 'h', 0, OPTION_HIDDEN, "Show this help list", 0},
+    {"inline", 'i', 0, 0, "Print without clearing the screen", 0},
+    {"no-scaling", 'n', 0, 0, "Print image in full resolution", 0},
+    {"progress", 'p', 0, 0, "Show progress when scaling image", 0},
+    {"no-vert-scaling", 'v', 0, 0, "Scale only to terminal width", 0},
     {0},
 };
 struct argp argp = {options, parse_opt, args_doc, doc, 0, 0, 0};
@@ -115,7 +115,7 @@ int main(int argc, char **argv){
     //Variable declarations, definitions, checks
     const struct winsize term = get_term_size();
     if (term.ws_row == 0){
-        printf("tpv: failed getting terminal size");
+        printf("tpv: failed getting terminal size\n");
         return EXIT_FAILURE;
     }
     unsigned char termbg[3] = {0};
@@ -827,7 +827,7 @@ void print_pixel_systemcolor(unsigned char top, unsigned char bot){
 int set_term_mode_raw(struct termios *term_current){
     struct termios term_raw;
     if (tcgetattr(STDIN_FILENO, term_current) == -1){
-        printf("tpv: could not get terminal attributes");
+        printf("tpv: could not get terminal attributes\n");
         return false;
     }
     term_raw = *term_current;
@@ -835,7 +835,7 @@ int set_term_mode_raw(struct termios *term_current){
     term_raw.c_cc[VMIN] = 0;
     term_raw.c_cc[VTIME] = 5;
     if (tcsetattr(STDIN_FILENO, TCSANOW, &term_raw) == -1){
-        printf("tpv: could not set terminal attributes");
+        printf("tpv: could not set terminal attributes\n");
         return false;
     }
     return true;
