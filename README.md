@@ -52,6 +52,16 @@ make install
 
 and TPV will be installed along with its documentation.
 
+## Ambitions
+
+The reason I'm not calling it a roadmap is because I don't really know where I want to go with this and what will actually get done. And they won't be done in order.
+
+* Writing my own image decoder
+* Improving execution speed
+* Writing to and reading from files to avoid decoding
+* Functionality for directories with images
+* Splitting the code into a library and a smaller linked binary
+
 ## Contact
 
 ### Issues

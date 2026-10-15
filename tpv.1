@@ -1,0 +1,138 @@
+.TH TPV 1 "October 2026" "version 1.0"
+.SH NAME
+tpv - terminal picture viewer
+.SH SYNOPSIS
+.B tpv
+[
+.ul
+OPTION
+]... [
+.ul
+FILE
+]
+.SH DESCRIPTION
+Print image file to standard output.
+.PP
+Supported formats are JPEG, PNG, TGA, BMP, PSD, HDR, PIC
+.br
+and PNM.
+.SH OPTIONS
+.BR "-c " DEPTH ", --color-depth=" DEPTH
+.RS
+Set output color depth. If omitted, highest capability of
+.br
+the terminal is used.
+.PP
+Accepted options are:
+.br
+.BR 24 " - 24-bit/truecolor"
+.br
+.BR 8 "  - 8-bit/256-color"
+.br
+.BR 7 "  - 88-color"
+.br
+.BR 4 "  - 4-bit/16-color"
+.br
+.BR 3 "  - 3-bit/8-color"
+.br
+.BR 1 "  - Black and white"
+.RE
+.PP
+.B "-f, --fast"
+.RS
+Scales by skipping pixels instead of properly scaling down
+.br
+the image for faster output.
+.RE
+.PP
+.B "-g, --grayscale"
+.RS
+Print image in grayscale instead of color.
+.RE
+.PP
+.B "-i, --inline"
+.RS
+Don't clear the screen before printing the image.
+.RE
+.PP
+.B "-n, --no-scaling"
+.RS
+Print the image at full resolution instead of scaling it
+.br
+down to fit the terminal.
+.RE
+.PP
+.B "-p, --progress"
+.RS
+Show a progress bar while scaling down the image.
+.RE
+.PP
+.B "-v, --no-vert-scaling"
+.RS
+Scale image to fit as close as possible on width, ignoring
+.br
+terminal height.
+.RE
+.PP
+.B "-h, --help"
+.RS
+Show shortlist of usage and options.
+.RE
+.SH COMPILING
+The program is designed to be compiled using GCC and Make.
+.PP
+Standard Makefile options of install, uninstall and clean
+.br
+are available, as well as rebuild for complete recompiling
+.br
+and debug for making a debuggable version. 
+.PP
+The following compile options are available when building
+.br
+from source:
+.PP
+.RS
+.BR nsatinc " - Disable increasing saturation when printing in"
+.br
+.RS
+8/16 color, use the actual pixel color value instead
+.RE
+.br
+.BR truebw " - Check which color is closest to black/white when"
+.br
+.RS
+printing in 8/16 color and use that instead of the
+.br
+standard BLACK and WHITE
+.RE
+.br
+.BR inline " - Invert usage of the --inline option, so images are"
+.br
+.RS
+printed without clearing the screen by default
+.RE
+.PP
+Further options for image decoding are available and
+.br
+defined in the header of stb_image.h
+.SH BUGS
+Bug reports on the projects GitHub
+.br
+.ul
+https://github.com/Dropkickx86/tpv.
+.PP
+.B Known bugs in current and previous release:
+.br
+V1.0 - Piping the program output does not work and will
+.br
+.RS
+cause the program to either fail or hang.
+.RE
+.SH AUTHOR
+Written by Emil Stenström.
+.PP
+stb_image by Sean Barrett, used in tpv under the MIT license
+.SH SEE ALSO
+stb libraries at
+.ul
+https://github.com/nothings/stb
