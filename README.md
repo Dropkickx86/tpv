@@ -2,6 +2,8 @@
 
 TPV is a simple tool for printing images in the terminal, basically a CAT for image files.
 
+The tool is developed for Linux.
+
 ## Supported formats
 
 The range of formats is decided by stb_image which is used for the decoding.

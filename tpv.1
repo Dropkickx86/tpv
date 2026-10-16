@@ -1,4 +1,4 @@
-.TH TPV 1 "October 2026" "version 1.0"
+.TH TPV 1 "October 2026" "version 1.0.1"
 .SH NAME
 tpv - terminal picture viewer
 .SH SYNOPSIS
@@ -123,10 +123,16 @@ https://github.com/Dropkickx86/tpv.
 .PP
 .B Known bugs in current and previous release:
 .br
-V1.0 - Piping the program output does not work and will
+[FIXED] V1.0 - Piping the program output does not work and
 .br
 .RS
-cause the program to either fail or hang.
+will cause the program to either fail or hang.
+.RE
+.br
+V1.0 - Printing with option --fast causes segmentation
+.br
+.RS
+fault at some output resolutions.
 .RE
 .SH AUTHOR
 Written by Emil Stenström.
