@@ -744,17 +744,31 @@ void print_picture(ImageInfo *img, const struct winsize *term, int fast, int col
                 color_top[0] = img->data[(row * img->w * img->c) + (col * img->c)];
                 color_top[1] = img->data[(row * img->w * img->c) + (col * img->c)];
                 color_top[2] = img->data[(row * img->w * img->c) + (col * img->c)];
-                color_bot[0] = img->data[((row + offset) * img->w * img->c) + (col * img->c)];
-                color_bot[1] = img->data[((row + offset) * img->w * img->c) + (col * img->c)];
-                color_bot[2] = img->data[((row + offset) * img->w * img->c) + (col * img->c)];
+                if (row + offset <= img->h){
+                    color_bot[0] = img->data[((row + offset) * img->w * img->c) + (col * img->c)];
+                    color_bot[1] = img->data[((row + offset) * img->w * img->c) + (col * img->c)];
+                    color_bot[2] = img->data[((row + offset) * img->w * img->c) + (col * img->c)];
+                }
+                else {
+                    color_bot[0] = color_top[0];
+                    color_bot[1] = color_top[1];
+                    color_bot[2] = color_top[2];
+                }
             }
             else {
                 color_top[0] = img->data[(row * img->w * img->c) + (col * img->c)];
                 color_top[1] = img->data[(row * img->w * img->c) + (col * img->c) + 1];
                 color_top[2] = img->data[(row * img->w * img->c) + (col * img->c) + 2];
-                color_bot[0] = img->data[((row + offset) * img->w * img->c) + (col * img->c)];
-                color_bot[1] = img->data[((row + offset) * img->w * img->c) + (col * img->c) + 1];
-                color_bot[2] = img->data[((row + offset) * img->w * img->c) + (col * img->c) + 2];
+                if (row + offset <= img->h){
+                    color_bot[0] = img->data[((row + offset) * img->w * img->c) + (col * img->c)];
+                    color_bot[1] = img->data[((row + offset) * img->w * img->c) + (col * img->c) + 1];
+                    color_bot[2] = img->data[((row + offset) * img->w * img->c) + (col * img->c) + 2];
+                }
+                else {
+                    color_bot[0] = color_top[0];
+                    color_bot[1] = color_top[1];
+                    color_bot[2] = color_top[2];
+                }
             }
             if (colordepth == 24){
                 print_pixel_24bit(color_top, color_bot);
