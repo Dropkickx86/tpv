@@ -5,6 +5,7 @@ Copyright (c) 2026, Emil Stenström
 Full license information in LICENSE file*/
 //System libraries
 #include <argp.h>
+#include <fcntl.h>
 #include <math.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -55,6 +56,7 @@ unsigned char get_ansi_level_88(unsigned char value);
 unsigned char get_ansi_level_256(unsigned char);
 float get_euclidean_distance_3D(unsigned char *p1, unsigned char *p2);
 void get_term_bg(unsigned char *bg_col);
+int get_term_fd();
 int get_term_colordepth();
 void get_term_colorpalette();
 struct winsize get_term_size();
@@ -66,7 +68,7 @@ void print_pixel_8bit(unsigned char top, unsigned char bot);
 void print_pixel_24bit(unsigned char *top, unsigned char *bot);
 void print_pixel_bw(unsigned char top, unsigned char bot);
 void print_pixel_systemcolor(unsigned char top, unsigned char bot);
-int set_term_mode_raw(struct termios *term_current);
+int set_term_mode_raw(struct termios *term_current, int fd);
 
 //Global vars and arrays
 int errno_safe = 0;
@@ -484,72 +486,92 @@ float get_euclidean_distance_3D(unsigned char *p1, unsigned char *p2){
 
 void get_term_bg(unsigned char *bg_col){
     struct termios term_old;
-    char buffer[64] = {0};
-    int inamount = 0;
-    if (!set_term_mode_raw(&term_old)){
+    char inbuffer[64] = {0};
+    ssize_t inamount = 0;
+    int fd = get_term_fd();
+    if (!set_term_mode_raw(&term_old, fd)){
         return;
     }
-    printf("\033]11;?\007");
-    printf("\033[c");
-    fflush(stdout);
-    do {
-        inamount += read(STDIN_FILENO, buffer + inamount, sizeof(buffer) - 1);
-    } while (buffer[inamount - 1] != 'c');
-    tcsetattr(STDIN_FILENO, TCSANOW, &term_old);
-    if (buffer[1] == ']'){
+    ssize_t outamount = write(fd, "\033]11;?\007\033[c", 10);
+    if (outamount == 10){
+        do {
+            inamount += read(fd, inbuffer + inamount, sizeof(inbuffer) - 1);
+        } while (inbuffer[inamount - 1] != 'c');
+    }
+    tcsetattr(fd, TCSANOW, &term_old);
+    close(fd);
+    if (inbuffer[1] == ']'){
         unsigned int r, g, b;
-        sscanf(buffer, "\033]11;rgb:%x/%x/%x", &r, &g, &b);
+        sscanf(inbuffer, "\033]11;rgb:%x/%x/%x", &r, &g, &b);
         bg_col[0] = (unsigned char)(r >> 8);
         bg_col[1] = (unsigned char)(g >> 8);
         bg_col[2] = (unsigned char)(b >> 8);
     }
 }
 
+int get_term_fd(){
+    int fd = open("/dev/tty", O_RDWR);
+    if (fd == -1){
+        for (int std_fd = STDIN_FILENO; std_fd <= STDERR_FILENO; std_fd++){
+            fd = open(ttyname(std_fd), O_RDWR | O_NOCTTY);
+            if (fd != -1){
+                break;
+            }
+        }
+        
+    }
+    return fd;
+}
+
 int get_term_colordepth(){
     struct termios term_old;
-    char buffer[256] = {0};
+    char inbuffer[256] = {0};
     const char *env_colorterm = getenv("COLORTERM");
     const char *env_term = getenv("TERM");
-    int inamount = 0;
-    if (!set_term_mode_raw(&term_old)){
+    ssize_t inamount = 0;
+    int fd = get_term_fd();
+    if (!set_term_mode_raw(&term_old, fd)){
         return -1;
     }
-    printf("\033[38;2;1;2;3m");
-    printf("\033P$qm\033\\");
-    printf("\033P+q524742\033\\");
-    printf("\033]4;255;?\033\\");
-    printf("\033]4;87;?\033\\");
-    printf("\033]4;15;?\033\\");
-    printf("\033]4;7;?\033\\");
-    printf("\033[c");
-    printf("\033[0m");
-    fflush(stdout);
-    do {
-        inamount += read(STDIN_FILENO, buffer + inamount, sizeof(buffer) - 1);
-    } while (buffer[inamount - 1] != 'c');
-    tcsetattr(STDIN_FILENO, TCSANOW, &term_old);
-    while (buffer[1] == 'P' && buffer[0] != '\0'){ 
-        if (buffer[2] == '1' && buffer[5] != '0'){
+    char outbuffer[80] = {"\033[38;2;1;2;3m"
+        "\033P$qm\033\\"
+        "\033P+q524742\033\\"
+        "\033]4;255;?\033\\"
+        "\033]4;87;?\033\\"
+        "\033]4;15;?\033\\"
+        "\033]4;7;?\033\\"
+        "\033[c"
+        "\033[0m"};
+    ssize_t outamount = write(fd, outbuffer, 79);
+    if (outamount == 79){
+        do {
+            inamount += read(fd, inbuffer + inamount, sizeof(inbuffer) - 1);
+        } while (inbuffer[inamount - 1] != 'c');
+    }
+    tcsetattr(fd, TCSANOW, &term_old);
+    close(fd);
+    while (inbuffer[1] == 'P' && inbuffer[0] != '\0'){ 
+        if (inbuffer[2] == '1' && inbuffer[5] != '0'){
             return 24;
         }
         else {
-            next_entry(buffer);
+            next_entry(inbuffer);
         }
     }
     if ((env_colorterm && (strcmp(env_colorterm, "truecolor") == 0 || strcmp(env_colorterm, "24bit") == 0)) || (env_term && (strcmp(env_term, "st-256color") == 0))){
         return 24;
     }
-    if (buffer[1] == ']'){
-        if (buffer[4] == '2'){
+    if (inbuffer[1] == ']'){
+        if (inbuffer[4] == '2'){
             return 8;
         }
-        else if (buffer[4] == '8'){
+        else if (inbuffer[4] == '8'){
             return 7;
         }
-        else if (buffer[4] == '1'){
+        else if (inbuffer[4] == '1'){
             return 4;
         }
-        else if (buffer[4] == '7'){
+        else if (inbuffer[4] == '7'){
             return 3;
         }
     }
@@ -562,33 +584,37 @@ int get_term_colordepth(){
 void get_term_colorpalette(){
     struct termios term_old;
     char buffer[430] = {0};
-    int inamount = 0;
-    if (!set_term_mode_raw(&term_old)){
+    ssize_t inamount = 0;
+    int fd = get_term_fd();
+    if (!set_term_mode_raw(&term_old, fd)){
         return;
     }
-    printf("\033]4;0;?\033\\");
-    printf("\033]4;1;?\033\\");
-    printf("\033]4;2;?\033\\");
-    printf("\033]4;3;?\033\\");
-    printf("\033]4;4;?\033\\");
-    printf("\033]4;5;?\033\\");
-    printf("\033]4;6;?\033\\");
-    printf("\033]4;7;?\033\\");
-    printf("\033]4;8;?\033\\");
-    printf("\033]4;9;?\033\\");
-    printf("\033]4;10;?\033\\");
-    printf("\033]4;11;?\033\\");
-    printf("\033]4;12;?\033\\");
-    printf("\033]4;13;?\033\\");
-    printf("\033]4;14;?\033\\");
-    printf("\033]4;15;?\033\\");
-    printf("\033[c");
-    printf("\033[0m");
-    fflush(stdout);
-    do {
-        inamount += read(STDIN_FILENO, buffer + inamount, sizeof(buffer) - 1);
-    } while (buffer[inamount - 1] != 'c');
-    tcsetattr(STDIN_FILENO, TCSANOW, &term_old);
+    char outbuffer[157] = {"\033]4;0;?\033\\"
+    "\033]4;1;?\033\\"
+    "\033]4;2;?\033\\"
+    "\033]4;3;?\033\\"
+    "\033]4;4;?\033\\"
+    "\033]4;5;?\033\\"
+    "\033]4;6;?\033\\"
+    "\033]4;7;?\033\\"
+    "\033]4;8;?\033\\"
+    "\033]4;9;?\033\\"
+    "\033]4;10;?\033\\"
+    "\033]4;11;?\033\\"
+    "\033]4;12;?\033\\"
+    "\033]4;13;?\033\\"
+    "\033]4;14;?\033\\"
+    "\033]4;15;?\033\\"
+    "\033[c"
+    "\033[0m"};
+    ssize_t outamount = write(fd, outbuffer, 156);
+    if (outamount == 156){
+        do {
+            inamount += read(fd, buffer + inamount, sizeof(buffer) - 1);
+        } while (buffer[inamount - 1] != 'c');
+    }
+    tcsetattr(fd, TCSANOW, &term_old);
+    close(fd);
     #ifdef TRUE_BW
     int bestblack = 765, bestwhite = 0;
     #endif
@@ -627,10 +653,12 @@ void get_term_colorpalette(){
 
 struct winsize get_term_size(){
     struct winsize term;
-    if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &term) == -1){
+    int fd = get_term_fd();
+    if (ioctl(fd, TIOCGWINSZ, &term) == -1){
         term.ws_row = 1;
     }
     term.ws_row -= 1;
+    close(fd);
     return term;
 }
 
@@ -838,9 +866,9 @@ void print_pixel_systemcolor(unsigned char top, unsigned char bot){
     }
 }
 
-int set_term_mode_raw(struct termios *term_current){
+int set_term_mode_raw(struct termios *term_current, int fd){
     struct termios term_raw;
-    if (tcgetattr(STDIN_FILENO, term_current) == -1){
+    if (tcgetattr(fd, term_current) == -1){
         printf("tpv: could not get terminal attributes\n");
         return false;
     }
@@ -848,7 +876,7 @@ int set_term_mode_raw(struct termios *term_current){
     term_raw.c_lflag &= ~(ICANON | ECHO);
     term_raw.c_cc[VMIN] = 0;
     term_raw.c_cc[VTIME] = 5;
-    if (tcsetattr(STDIN_FILENO, TCSANOW, &term_raw) == -1){
+    if (tcsetattr(fd, TCSANOW, &term_raw) == -1){
         printf("tpv: could not set terminal attributes\n");
         return false;
     }
