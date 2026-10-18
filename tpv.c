@@ -4,15 +4,18 @@ Copyright (c) 2026, Emil Stenström
 
 Full license information in LICENSE file*/
 //System libraries
+#define _POSIX_C_SOURCE 200809L
 #include <argp.h>
 #include <fcntl.h>
 #include <math.h>
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <termios.h>
 #include <unistd.h>
 #include <sys/ioctl.h>
+#include <sys/poll.h>
+#include <sys/stat.h>
 
 //STB_IMAGE settings and include
 #define STB_IMAGE_IMPLEMENTATION
@@ -114,7 +117,47 @@ int main(int argc, char **argv){
     #endif
     argp_parse(&argp, argc, argv, ARGP_NO_HELP, 0, &arguments);
 
-    //Variable declarations, definitions, checks
+    //Check for pipe, can terminate execution
+    char pipebuffer[128] = {0};
+    if (!arguments.filepath){
+        struct stat statinfo;
+        if (fstat(STDIN_FILENO, &statinfo) == -1){
+            printf("tpv: issue reading from pipe\n");
+            return EXIT_FAILURE;
+        }
+        if (S_ISFIFO(statinfo.st_mode)){
+            int inamount = 0, prevamount = 0;
+            do {
+                prevamount = inamount;
+                inamount += read(STDIN_FILENO, pipebuffer, 127);
+            } while(prevamount != inamount);
+            if (inamount == 0){
+                printf("tpv: issue reading from pipe\n");
+                return EXIT_FAILURE;
+            }
+            if (pipebuffer[inamount - 1] == '\n'){
+                if (pipebuffer[inamount - 2] == '\r'){
+                    inamount -= 2;
+                }
+                else {
+                    inamount -=1;
+                }
+            }
+            pipebuffer[inamount] = '\0';
+        }
+        else if (S_ISREG(statinfo.st_mode)){
+            ssize_t pathlength = readlink("/proc/self/fd/0", pipebuffer, 127);
+            if (pathlength == -1){
+                printf("tpv: issue reading from pipe\n");
+                return EXIT_FAILURE;
+            }
+            pipebuffer[pathlength] = '\0';
+            close(STDIN_FILENO);
+        }
+        arguments.filepath = pipebuffer;
+    }
+
+    //Variable declarations, definitions, checks, can terminate execution
     const struct winsize term = get_term_size();
     if (term.ws_row == 0){
         printf("tpv: failed getting terminal size\n");
@@ -736,7 +779,10 @@ error_t parse_opt(int key, char *arg, struct argp_state *state){
         break;
     case ARGP_KEY_END:
         if (!arguments->filepath){
-            argp_usage(state);
+            struct pollfd p = { .fd = STDIN_FILENO, .events = POLLIN};
+            if (poll(&p, 1, 0) == 0){
+                argp_usage(state);
+            }
         }
         break;
     default:
