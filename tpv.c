@@ -503,13 +503,13 @@ unsigned char convert_systemcolor(unsigned char *color, int extended){
 
 void dest_wb(){
     if (!wb.buffer){
-        (void) write(STDERR_FILENO, "tpv: write buffer not allocated", 31);
+        fprintf(stderr, "tpv: write buffer not allocated");
     }
     else {
         if (wb.cursor != wb.buffer){
             int n = write(STDOUT_FILENO, wb.buffer, wb.cursor - wb.buffer);
             if (n < wb.cursor - wb.buffer){
-                (void) write(STDERR_FILENO, "tpv: failed to write to stdout", 30);
+                fprintf(stderr, "tpv: failed to write to stdout");
             }
         }
         free(wb.buffer);
@@ -743,13 +743,13 @@ int init_wb(){
         wb.buffer = malloc(WB_SIZE);
         wb.cursor = wb.buffer;
         if (!wb.buffer){
-            (void) write(STDERR_FILENO, "tpv: failed to allocate write buffer", 36);
+            fprintf(stderr, "tpv: failed to allocate write buffer");
             return EXIT_FAILURE;
         }
         return EXIT_SUCCESS;
     }
     else {
-        (void) write(STDERR_FILENO, "tpv: double init of write buffer", 32);
+        fprintf(stderr, "tpv: double init of write buffer");
         return EXIT_SUCCESS;
     }
 }
