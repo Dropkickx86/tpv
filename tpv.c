@@ -1023,7 +1023,10 @@ void print_wb(char *string){
         strlen++;
     } while (string[strlen] != '\0');
     if (strlen > (wb.buffer + WB_SIZE) - wb.cursor){
-        write(STDOUT_FILENO, wb.buffer, wb.cursor - wb.buffer);
+        int written = 0, towrite = wb.cursor - wb.buffer;
+        do {
+            written += write(STDOUT_FILENO, wb.buffer, towrite);
+        } while (written < towrite);
         wb.cursor = wb.buffer;
     }
     for (int i = 0; i < strlen; i++){
