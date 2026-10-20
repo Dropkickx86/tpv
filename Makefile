@@ -19,6 +19,9 @@ endif
 ifdef inline
 	CFLAGS += -DDEFAULT_INLINE
 endif
+ifdef wbsize
+	CFLAGS += -DWB_SIZE=$(WB_SIZE)
+endif
 
 $(TARGET): $(OBJ)
 	$(CC) $(OBJ) -o $(TARGET) $(LDFLAGS)
