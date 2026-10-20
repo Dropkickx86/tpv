@@ -23,6 +23,15 @@ Full license information in LICENSE file*/
 #define STBI_NO_GIF
 #include "stb_image.h"
 
+//Global defines
+#ifndef WB_SIZE
+#define WB_SIZE 16*1024
+#endif
+#if WB_SIZE < 39
+#undef WB_SIZE
+#define WB_SIZE 39
+#endif
+
 //Local defines
 #define true 1
 #define false 0
@@ -42,6 +51,10 @@ typedef struct {
     int w, h, c;
     unsigned char *data;
 } ImageInfo;
+typedef struct {
+    char *buffer;
+    char *cursor;
+} WriteBuffer;
 
 //Functions
 unsigned char apply_image_alpha(unsigned char color, unsigned char bg, unsigned char a);
@@ -55,6 +68,7 @@ unsigned char convert_grayscale(unsigned char *color);
 unsigned char convert_grayscale_88(unsigned char *color);
 unsigned char convert_grayscale_256(unsigned char *color);
 unsigned char convert_systemcolor(unsigned char *color, int extended);
+void dest_wb();
 unsigned char get_ansi_level_88(unsigned char value);
 unsigned char get_ansi_level_256(unsigned char);
 float get_euclidean_distance_3D(unsigned char *p1, unsigned char *p2);
@@ -63,6 +77,7 @@ int get_term_fd();
 int get_term_colordepth();
 void get_term_colorpalette();
 struct winsize get_term_size();
+int init_wb();
 void next_entry(char *buffer);
 error_t parse_opt(int key, char *arg, struct argp_state *state);
 void print_clear();
@@ -71,10 +86,11 @@ void print_pixel_8bit(unsigned char top, unsigned char bot);
 void print_pixel_24bit(unsigned char *top, unsigned char *bot);
 void print_pixel_bw(unsigned char top, unsigned char bot);
 void print_pixel_systemcolor(unsigned char top, unsigned char bot);
+void print_wb(char *string);
 int set_term_mode_raw(struct termios *term_current, int fd);
 
 //Global vars and arrays
-int errno_safe = 0;
+WriteBuffer wb;
 char doc[] = "CLI tool to print images in terminal";
 char args_doc[] = "filepath";
 struct argp_option options[] = {
@@ -485,6 +501,23 @@ unsigned char convert_systemcolor(unsigned char *color, int extended){
     return (unsigned char) closestindex;
 }
 
+void dest_wb(){
+    if (!wb.buffer){
+        (void) write(STDERR_FILENO, "tpv: write buffer not allocated", 31);
+    }
+    else {
+        if (wb.cursor != wb.buffer){
+            int n = write(STDOUT_FILENO, wb.buffer, wb.cursor - wb.buffer);
+            if (n < wb.cursor - wb.buffer){
+                (void) write(STDERR_FILENO, "tpv: failed to write to stdout", 30);
+            }
+        }
+        free(wb.buffer);
+        wb.buffer = NULL;
+        wb.cursor = wb.buffer;
+    }
+}
+
 unsigned char get_ansi_level_88(unsigned char value){
     const unsigned char levels[4] = {0, 139, 205, 255};
     unsigned char level = 0;
@@ -705,6 +738,39 @@ struct winsize get_term_size(){
     return term;
 }
 
+int init_wb(){
+    if (!wb.buffer){
+        wb.buffer = malloc(WB_SIZE);
+        wb.cursor = wb.buffer;
+        if (!wb.buffer){
+            (void) write(STDERR_FILENO, "tpv: failed to allocate write buffer", 36);
+            return EXIT_FAILURE;
+        }
+        return EXIT_SUCCESS;
+    }
+    else {
+        (void) write(STDERR_FILENO, "tpv: double init of write buffer", 32);
+        return EXIT_SUCCESS;
+    }
+}
+
+void itostr(char *output, int input){
+    int index = 0;
+    if (input > 99){
+        output[index++] = (input / 100) + 48;
+        input = input % 100;
+    }
+    if (input > 9){
+        output[index++] = (input / 10) + 48;
+        input = input % 10;
+    }
+    else if (index > 0) {
+        output[index++] = '0';
+    }
+    output[index++] = input + 48;
+    output[index] = '\0';
+}
+
 void next_entry(char *buffer){
     int index = 0, nextindex = 0;
     for (int i = 0; buffer[i] != '\0'; i++){
@@ -797,6 +863,9 @@ void print_clear(){
 }
 
 void print_picture(ImageInfo *img, const struct winsize *term, int fast, int colordepth){
+    if (init_wb() == EXIT_FAILURE){
+        return;
+    }
     int offset = 1;
     if (fast){
         if (img->w / term->ws_col > img->h / (term->ws_row * 2)){
@@ -867,48 +936,103 @@ void print_picture(ImageInfo *img, const struct winsize *term, int fast, int col
             }
             col_out++;
         }
-        printf("\033[0m\n");
+        print_wb("\033[0m\n");
     }
-    printf("\033[0m");
+    print_wb("\033[0m");
+    dest_wb();
 }
 
 void print_pixel_8bit(unsigned char top, unsigned char bot){
-    printf("\033[38;5;%dm", top);
-    printf("\033[48;5;%dm\u2580", bot);
+    char output[23] = {0};
+    strcat(output, "\033[38;5;");
+    char temp[4];
+    itostr(temp, top);
+    strcat(output, temp);
+    strcat(output, ";48;5;");
+    itostr(temp, bot);
+    strcat(output, temp);
+    strcat(output, "m\u2580");
+    print_wb(output);
 }
 
 void print_pixel_24bit(unsigned char *top, unsigned char *bot){
-    printf("\033[38;2;%d;%d;%dm", top[0], top[1], top[2]);
-    printf("\033[48;2;%d;%d;%dm\u2580", bot[0], bot[1], bot[2]);
+    char output[40] = {0};
+    strcat(output, "\033[38;2;");
+    char temp[4];
+    for (int i = 0; i < 3; i++){
+        itostr(temp, top[i]);
+        strcat(output, temp);
+        output[strlen(output)] = ';';
+    }
+    strcat(output, "48;2;");
+    for (int i = 0; i < 3; i++){
+        itostr(temp, bot[i]);
+        strcat(output, temp);
+        if (i != 2){
+            output[strlen(output)] = ';';
+        }
+        else {
+            output[strlen(output)] = 'm';
+        }
+    }
+    strcat(output, "\u2580");
+    print_wb(output);
 }
 
 void print_pixel_bw(unsigned char top, unsigned char bot){
     if (top + bot == 2){
-        printf("\033[7m \033[27m");
+        print_wb("\033[7m \033[27m");
     }
     else if (top + bot == 0){
-        printf(" ");
+        print_wb(" ");
     }
     else if (top == 1){
-        printf("\u2580");
+        print_wb("\u2580");
     }
     else if (bot == 1){
-        printf("\033[7m\u2580\033[27m");
+        print_wb("\033[7m\u2580\033[27m");
     }
 }
 
 void print_pixel_systemcolor(unsigned char top, unsigned char bot){
+    char output[14] = {0};
+    strcat(output, "\033[");
+    char temp[4];
     if (top < 8){
-        printf("\033[%dm", top + 30);
+        itostr(temp, top + 30);
     }
     else {
-        printf("\033[%dm", top + 82);
+        itostr(temp, top + 82);
     }
+    strcat(output, temp);
+    output[strlen(output)] = ';';
     if (bot < 8){
-        printf("\033[%dm\u2580", bot + 40);
+        itostr(temp, bot + 40);
     }
     else {
-        printf("\033[%dm\u2580", bot + 92);
+        itostr(temp, bot + 92);
+    }
+    strcat(output, temp);
+    strcat(output, "m\u2580");
+    print_wb(output);
+}
+
+void print_wb(char *string){
+    int strlen = 0;
+    do {
+        strlen++;
+    } while (string[strlen] != '\0');
+    if (strlen > (wb.buffer + WB_SIZE) - wb.cursor){
+        int written = 0, towrite = wb.cursor - wb.buffer;
+        char *curwrite = wb.buffer;
+        do {
+            written += write(STDOUT_FILENO, curwrite, towrite);
+            curwrite += written;
+        } while (written < towrite);
+        wb.cursor = wb.buffer;
+    }
+    for (int i = 0; i < strlen; i++){
+        *wb.cursor++ = string[i];
     }
 }
 
