@@ -317,13 +317,23 @@ void apply_image_scale(ImageInfo *img, int scalefactor, int progress){
                         #ifdef SCALING_PRECISE
                         coloffset++;
                         #else
-                        coloffset += scalefactor / 2;
+                        if (scalefactor > 2){
+                            coloffset += scalefactor / 2;
+                        }
+                        else {
+                            coloffset++;
+                        }
                         #endif
                     }
                     #ifdef SCALING_PRECISE
                     rowoffset++;
                     #else
-                    rowoffset += scalefactor / 2;
+                    if (scalefactor > 2){
+                        rowoffset += scalefactor / 2;
+                    }
+                    else {
+                        rowoffset++;
+                    }
                     #endif
                 }
                 img->data[index++] = val / amount;
