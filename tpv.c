@@ -201,7 +201,14 @@ int main(int argc, char **argv){
         #endif
     }
     ImageInfo img;
+    if (arguments.progress){
+        printf("Loading image...");
+        fflush(stdout);
+    }
     img.data = stbi_load(arguments.filepath, &img.w, &img.h, &img.c, 0);
+    if (arguments.progress){
+        printf("loaded\n");
+    }
     if (!img.data){
         printf("%s\n", stbi_failure_reason());
         return EXIT_FAILURE;
@@ -288,6 +295,7 @@ unsigned char apply_image_alpha(unsigned char color, unsigned char bg, unsigned 
 void apply_image_scale(ImageInfo *img, int scalefactor, int progress){
     int finalIndex, cursor = 5;
     if (progress){
+        setvbuf(stdout, NULL, _IONBF, 0);
         float h = ceil((float)img->h / (float)scalefactor);
         float w = ceil((float)img->w / (float)scalefactor);
         finalIndex = (int) h * (int) w * img->c;
@@ -327,6 +335,7 @@ void apply_image_scale(ImageInfo *img, int scalefactor, int progress){
     img->w = (int) w;
     if (progress){
         printf("\n");
+        setvbuf(stdout, NULL, _IOLBF, 0);
     }
 }
 
