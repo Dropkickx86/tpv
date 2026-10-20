@@ -1024,8 +1024,10 @@ void print_wb(char *string){
     } while (string[strlen] != '\0');
     if (strlen > (wb.buffer + WB_SIZE) - wb.cursor){
         int written = 0, towrite = wb.cursor - wb.buffer;
+        char *curwrite = wb.buffer;
         do {
-            written += write(STDOUT_FILENO, wb.buffer, towrite);
+            written += write(STDOUT_FILENO, curwrite, towrite);
+            curwrite += written;
         } while (written < towrite);
         wb.cursor = wb.buffer;
     }
