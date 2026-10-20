@@ -16,6 +16,9 @@ endif
 ifdef truebw
 	CFLAGS += -DTRUE_BW
 endif
+ifdef scaleprec
+	CFLAGS += -DSCALE_PRECISE
+endif
 ifdef inline
 	CFLAGS += -DDEFAULT_INLINE
 endif

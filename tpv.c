@@ -314,9 +314,17 @@ void apply_image_scale(ImageInfo *img, int scalefactor, int progress){
                     while (coloffset < scalefactor && col + coloffset < img->w){
                         val += img->data[((row + rowoffset) * img->w * img->c) + ((col + coloffset) * img->c) + ch];
                         amount++;
+                        #ifdef SCALING_PRECISE
                         coloffset++;
+                        #else
+                        coloffset += scalefactor / 2;
+                        #endif
                     }
+                    #ifdef SCALING_PRECISE
                     rowoffset++;
+                    #else
+                    rowoffset += scalefactor / 2;
+                    #endif
                 }
                 img->data[index++] = val / amount;
                 if (progress && index % 500 == 0){
