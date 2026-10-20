@@ -532,7 +532,7 @@ void get_term_bg(unsigned char *bg_col){
     char inbuffer[64] = {0};
     ssize_t inamount = 0;
     int fd = get_term_fd();
-    if (!set_term_mode_raw(&term_old, fd)){
+    if (set_term_mode_raw(&term_old, fd) == EXIT_FAILURE){
         return;
     }
     ssize_t outamount = write(fd, "\033]11;?\007\033[c", 10);
@@ -573,7 +573,7 @@ int get_term_colordepth(){
     const char *env_term = getenv("TERM");
     ssize_t inamount = 0;
     int fd = get_term_fd();
-    if (!set_term_mode_raw(&term_old, fd)){
+    if (set_term_mode_raw(&term_old, fd) == EXIT_FAILURE){
         return -1;
     }
     char outbuffer[80] = {"\033[38;2;1;2;3m"
@@ -629,7 +629,7 @@ void get_term_colorpalette(){
     char buffer[430] = {0};
     ssize_t inamount = 0;
     int fd = get_term_fd();
-    if (!set_term_mode_raw(&term_old, fd)){
+    if (set_term_mode_raw(&term_old, fd) == EXIT_FAILURE){
         return;
     }
     char outbuffer[157] = {"\033]4;0;?\033\\"
@@ -788,7 +788,7 @@ error_t parse_opt(int key, char *arg, struct argp_state *state){
     default:
         return ARGP_ERR_UNKNOWN;
     }
-    return 0;
+    return EXIT_SUCCESS;
 }
 
 void print_clear(){
@@ -916,7 +916,7 @@ int set_term_mode_raw(struct termios *term_current, int fd){
     struct termios term_raw;
     if (tcgetattr(fd, term_current) == -1){
         printf("tpv: could not get terminal attributes\n");
-        return false;
+        return EXIT_FAILURE;
     }
     term_raw = *term_current;
     term_raw.c_lflag &= ~(ICANON | ECHO);
@@ -924,7 +924,7 @@ int set_term_mode_raw(struct termios *term_current, int fd){
     term_raw.c_cc[VTIME] = 5;
     if (tcsetattr(fd, TCSANOW, &term_raw) == -1){
         printf("tpv: could not set terminal attributes\n");
-        return false;
+        return EXIT_FAILURE;
     }
-    return true;
+    return EXIT_SUCCESS;
 }
