@@ -68,19 +68,19 @@ unsigned char convert_grayscale(unsigned char *color);
 unsigned char convert_grayscale_88(unsigned char *color);
 unsigned char convert_grayscale_256(unsigned char *color);
 unsigned char convert_systemcolor(unsigned char *color, int extended);
-void dest_wb();
+void dest_wb(void);
 unsigned char get_ansi_level_88(unsigned char value);
 unsigned char get_ansi_level_256(unsigned char);
 float get_euclidean_distance_3D(unsigned char *p1, unsigned char *p2);
 void get_term_bg(unsigned char *bg_col);
-int get_term_fd();
-int get_term_colordepth();
-void get_term_colorpalette();
-struct winsize get_term_size();
-int init_wb();
+int get_term_fd(void);
+int get_term_colordepth(void);
+void get_term_colorpalette(void);
+struct winsize get_term_size(void);
+int init_wb(void);
 void next_entry(char *buffer);
 error_t parse_opt(int key, char *arg, struct argp_state *state);
-void print_clear();
+void print_clear(void);
 void print_picture(ImageInfo *img, const struct winsize *term, int fast, int colordepth);
 void print_pixel_8bit(unsigned char top, unsigned char bot);
 void print_pixel_24bit(unsigned char *top, unsigned char *bot);
@@ -540,7 +540,7 @@ unsigned char convert_systemcolor(unsigned char *color, int extended){
     return (unsigned char) closestindex;
 }
 
-void dest_wb(){
+void dest_wb(void){
     if (!wb.buffer){
         fprintf(stderr, "tpv: write buffer not allocated");
     }
@@ -624,7 +624,7 @@ void get_term_bg(unsigned char *bg_col){
     }
 }
 
-int get_term_fd(){
+int get_term_fd(void){
     int fd = open("/dev/tty", O_RDWR);
     if (fd == -1){
         for (int std_fd = STDIN_FILENO; std_fd <= STDERR_FILENO; std_fd++){
@@ -638,7 +638,7 @@ int get_term_fd(){
     return fd;
 }
 
-int get_term_colordepth(){
+int get_term_colordepth(void){
     struct termios term_old;
     char inbuffer[256] = {0};
     const char *env_colorterm = getenv("COLORTERM");
@@ -696,7 +696,7 @@ int get_term_colordepth(){
     return 1;
 }
 
-void get_term_colorpalette(){
+void get_term_colorpalette(void){
     struct termios term_old;
     char buffer[430] = {0};
     ssize_t inamount = 0;
@@ -704,7 +704,7 @@ void get_term_colorpalette(){
     if (set_term_mode_raw(&term_old, fd) == EXIT_FAILURE){
         return;
     }
-    char outbuffer[157] = {"\033]4;0;?\033\\"
+    char outbuffer[158] = {"\033]4;0;?\033\\"
     "\033]4;1;?\033\\"
     "\033]4;2;?\033\\"
     "\033]4;3;?\033\\"
@@ -722,7 +722,7 @@ void get_term_colorpalette(){
     "\033]4;15;?\033\\"
     "\033[c"
     "\033[0m"};
-    ssize_t outamount = write(fd, outbuffer, 156);
+    ssize_t outamount = write(fd, outbuffer, 157);
     if (outamount == 156){
         do {
             inamount += read(fd, buffer + inamount, sizeof(buffer) - 1);
@@ -766,7 +766,7 @@ void get_term_colorpalette(){
     }
 }
 
-struct winsize get_term_size(){
+struct winsize get_term_size(void){
     struct winsize term;
     int fd = get_term_fd();
     if (ioctl(fd, TIOCGWINSZ, &term) == -1){
@@ -777,7 +777,7 @@ struct winsize get_term_size(){
     return term;
 }
 
-int init_wb(){
+int init_wb(void){
     if (!wb.buffer){
         wb.buffer = malloc(WB_SIZE);
         wb.cursor = wb.buffer;
@@ -896,7 +896,7 @@ error_t parse_opt(int key, char *arg, struct argp_state *state){
     return EXIT_SUCCESS;
 }
 
-void print_clear(){
+void print_clear(void){
     printf("\033[2J");
     printf("\033[H");
     fflush(stdout);
