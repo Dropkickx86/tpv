@@ -173,6 +173,18 @@ int main(int argc, char **argv){
         arguments.filepath = pipebuffer;
     }
 
+    //Check input file, can terminate execution
+    FILE *filecheck = fopen(arguments.filepath, "rb");
+    if (!filecheck){
+        char temp[128] = "tpv: could not open ";
+        strcat(temp, arguments.filepath);
+        perror(temp);
+        return EXIT_FAILURE;
+    }
+    else {
+        fclose(filecheck);
+    }
+
     //Variable declarations, definitions, checks, can terminate execution
     const struct winsize term = get_term_size();
     if (term.ws_row == 0){
