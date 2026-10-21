@@ -723,7 +723,7 @@ void get_term_colorpalette(void){
     "\033[c"
     "\033[0m"};
     ssize_t outamount = write(fd, outbuffer, 157);
-    if (outamount == 156){
+    if (outamount == 157){
         do {
             inamount += read(fd, buffer + inamount, sizeof(buffer) - 1);
         } while (buffer[inamount - 1] != 'c');
