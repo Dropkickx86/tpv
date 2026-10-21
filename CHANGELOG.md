@@ -1,4 +1,7 @@
 # TPV - Changelog
+## Version 1.1.1 - 21-10-2026
+### Bugfixes
+* Fixed issue with screen clearing too late.
 ## Version 1.1.0 - 21-10-2026
 ### Improvements
 * Added support for piping in file.
