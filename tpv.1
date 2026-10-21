@@ -1,4 +1,4 @@
-.TH TPV 1 "October 2026" "version 1.0.1"
+.TH TPV 1 "October 2026" "version 1.1.0"
 .SH NAME
 tpv - terminal picture viewer
 .SH SYNOPSIS
@@ -59,7 +59,7 @@ Don't clear the screen before printing the image.
 .RS
 Print the image at full resolution instead of scaling it
 .br
-down to fit the terminal.
+down to fit the terminal. Incompatible with --fast.
 .RE
 .PP
 .B "-p, --progress"
@@ -71,7 +71,7 @@ Show a progress bar while scaling down the image.
 .RS
 Scale image to fit as close as possible on width, ignoring
 .br
-terminal height.
+terminal height. Incompatible with --fast.
 .RE
 .PP
 .B "-h, --help"
@@ -106,10 +106,20 @@ printing in 8/16 color and use that instead of the
 standard BLACK and WHITE
 .RE
 .br
+.BR scaleprec " - Enable more precise scaling for a more correct"
+.br
+.RS
+output but longer processing time
+.RE
+.br
 .BR inline " - Invert usage of the --inline option, so images are"
 .br
 .RS
 printed without clearing the screen by default
+.RE
+.br
+.BR wbsize=n " - Set size of output buffer, default is 16kb"
+.RS
 .RE
 .PP
 Further options for image decoding are available and
@@ -129,11 +139,13 @@ https://github.com/Dropkickx86/tpv.
 will cause the program to either fail or hang.
 .RE
 .br
-V1.0 - Printing with option --fast causes segmentation
+[FIXED] V1.0 - Printing with option --fast causes segmentation
 .br
 .RS
 fault at some output resolutions.
 .RE
+.br
+[FIXED] V1.0 - Progress bar was not printed live while scaling.
 .SH AUTHOR
 Written by Emil Stenström.
 .PP

@@ -28,7 +28,7 @@ More detailed information in [their project](https://github.com/nothings/stb).
 
 ## How to use
 
-Usage of TPV is really simple, just provide the path to an image and it will be printed to the console.
+Usage of TPV is really simple, just provide the path to an image and it will be printed to the terminal.
 
 Options are availible for printing in different color depths, grayscale etc. All options can be listed by running
 
